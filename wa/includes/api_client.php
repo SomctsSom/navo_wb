@@ -11,7 +11,7 @@ require_once __DIR__ . '/helpers.php';
 function wa_api(string $method, string $path, array $data = [], array $files = []): array
 {
     wa_start_session();
-    $base = rtrim((string) wa_env('WC_API_URL', 'http://127.0.0.1:8090'), '/');
+    $base = rtrim(wa_wc_api_url(), '/');
     $url = $base . '/' . ltrim($path, '/');
 
     $headers = ['Accept: application/json'];
@@ -91,7 +91,7 @@ function wa_api_ok(array $response): bool
 function wa_api_multipart(string $path, array $fields, array $file = [], string $fileField = 'image'): array
 {
     wa_start_session();
-    $base = rtrim((string) wa_env('WC_API_URL', 'http://127.0.0.1:8090'), '/');
+    $base = rtrim(wa_wc_api_url(), '/');
     $url = $base . '/' . ltrim($path, '/');
     $headers = ['Accept: application/json'];
     $token = $_SESSION['api_token'] ?? null;

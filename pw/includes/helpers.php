@@ -40,9 +40,104 @@ function pw_rich(?string $html): string
     return (string) $html;
 }
 
+/**
+ * Directory of the front controller, e.g. "/pw/public" when hosted in a subdirectory.
+ */
+function pw_script_base_path(): string
+{
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $dir = dirname($script);
+    if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
+        return '';
+    }
+    return rtrim($dir, '/');
+}
+
+/**
+ * Normalize REQUEST_URI path relative to this app's public folder.
+ */
+function pw_request_path(): string
+{
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $path = '/' . trim(str_replace('\\', '/', $path), '/');
+    if ($path === '//') {
+        $path = '/';
+    }
+    $base = pw_script_base_path();
+    if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+        $path = substr($path, strlen($base)) ?: '/';
+        $path = '/' . trim($path, '/');
+        if ($path === '//') {
+            $path = '/';
+        }
+    }
+    if ($path !== '/' && str_ends_with($path, '/')) {
+        $path = rtrim($path, '/');
+    }
+    return $path === '' ? '/' : $path;
+}
+
+function pw_request_is_local_host(): bool
+{
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $host = explode(':', $host)[0];
+    return in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+function pw_request_origin(): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443')
+        || (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
+    $scheme = $https ? 'https' : 'http';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    return $scheme . '://' . $host;
+}
+
+function pw_url_looks_local(string $url): bool
+{
+    $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+    return $host === '' || in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+/**
+ * Public site base URL (no trailing slash). Auto-detects subdirectory hosts.
+ */
+function pw_base_url(): string
+{
+    $configured = rtrim((string) pw_env('PW_BASE_URL', ''), '/');
+    if ($configured !== '' && !(pw_url_looks_local($configured) && !pw_request_is_local_host())) {
+        return $configured;
+    }
+    $origin = pw_request_origin();
+    $basePath = pw_script_base_path();
+    return $origin . $basePath;
+}
+
+/**
+ * Website Core API base for server-side calls.
+ */
+function pw_wc_api_url(): string
+{
+    $configured = rtrim((string) pw_env('WC_API_URL', ''), '/');
+    if ($configured !== '' && !(pw_url_looks_local($configured) && !pw_request_is_local_host())) {
+        return $configured;
+    }
+    // Same host sibling: /pw/public → /wc/public
+    $origin = pw_request_origin();
+    $basePath = pw_script_base_path();
+    if ($basePath !== '' && preg_match('#/pw/public$#', $basePath) === 1) {
+        return $origin . preg_replace('#/pw/public$#', '/wc/public', $basePath);
+    }
+    if ($configured !== '') {
+        return $configured;
+    }
+    return $origin . '/wc/public';
+}
+
 function pw_api(string $path, array $query = []): array
 {
-    $base = rtrim((string) pw_env('WC_API_URL', 'http://127.0.0.1:8090'), '/');
+    $base = pw_wc_api_url();
     $url = $base . '/' . ltrim($path, '/');
     if ($query) {
         $url .= '?' . http_build_query($query);
@@ -69,7 +164,7 @@ function pw_api(string $path, array $query = []): array
  */
 function pw_api_post(string $path, array $data = []): array
 {
-    $base = rtrim((string) pw_env('WC_API_URL', 'http://127.0.0.1:8090'), '/');
+    $base = pw_wc_api_url();
     $url = $base . '/' . ltrim($path, '/');
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -95,7 +190,7 @@ function pw_api_post(string $path, array $data = []): array
 
 function pw_url(string $path = '/'): string
 {
-    $base = rtrim((string) pw_env('PW_BASE_URL', ''), '/');
+    $base = pw_base_url();
     $path = '/' . ltrim($path, '/');
     return $base . ($path === '/' ? '' : $path);
 }

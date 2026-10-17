@@ -5,14 +5,7 @@ require_once dirname(__DIR__) . '/includes/view.php';
 
 wa_start_session();
 
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$path = '/' . trim($path, '/');
-if ($path === '//') {
-    $path = '/';
-}
-if ($path !== '/' && str_ends_with($path, '/')) {
-    $path = rtrim($path, '/');
-}
+$path = wa_request_path();
 if ($path === '/') {
     $path = wa_user() ? '/dashboard' : '/login';
 }

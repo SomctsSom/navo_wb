@@ -3,14 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/helpers.php';
 
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$path = '/' . trim($path, '/');
-if ($path === '//') {
-    $path = '/';
-}
-if ($path !== '/' && str_ends_with($path, '/')) {
-    $path = rtrim($path, '/');
-}
+$path = pw_request_path();
 
 if (str_starts_with($path, '/assets/')) {
     $file = __DIR__ . $path;
