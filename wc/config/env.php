@@ -33,6 +33,18 @@ function wms_load_env(?string $path = null): void
         [$key, $value] = explode('=', $line, 2);
         $key = trim($key);
         $value = trim($value);
+        // Strip unquoted inline comments (keep # inside "..." or '...')
+        if (
+            $value !== ''
+            && !str_starts_with($value, '"')
+            && !str_starts_with($value, "'")
+            && str_contains($value, '#')
+        ) {
+            $hashPos = strpos($value, '#');
+            if ($hashPos !== false) {
+                $value = rtrim(substr($value, 0, $hashPos));
+            }
+        }
         if (
             (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
             (str_starts_with($value, "'") && str_ends_with($value, "'"))
