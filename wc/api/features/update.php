@@ -20,6 +20,9 @@ if (!$existing) {
 }
 
 $title = trim((string) ($input['title'] ?? $existing['title']));
+$mainTitle = array_key_exists('main_title', $input)
+    ? trim((string) $input['main_title'])
+    : (string) ($existing['main_title'] ?? '');
 $description = array_key_exists('description', $input)
     ? trim((string) $input['description'])
     : (string) ($existing['description'] ?? '');
@@ -46,14 +49,18 @@ if (array_key_exists('cards_json', $input)) {
 if ($title === '') {
     json_error('Title is required', 422);
 }
+if (mb_strlen($mainTitle) > 200) {
+    json_error('Main title must be 200 characters or less', 422);
+}
 
 $pdo->beginTransaction();
 try {
     $pdo->prepare(
-        'UPDATE features SET title = :title, description = :description,
+        'UPDATE features SET title = :title, main_title = :main_title, description = :description,
          sort_order = :sort, is_active = :active, updated_at = :u, updated_by = :by WHERE id = :id'
     )->execute([
         ':title' => $title,
+        ':main_title' => $mainTitle !== '' ? $mainTitle : null,
         ':description' => $description !== '' ? $description : null,
         ':sort' => $sortOrder,
         ':active' => $isActive,

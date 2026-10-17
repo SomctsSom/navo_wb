@@ -21,6 +21,8 @@ $map = [
     'vision_missions' => ['perm' => 'vision_missions.restore', 'endpoint_hint' => 'vision-missions'],
     'features' => ['perm' => 'features.restore', 'endpoint_hint' => 'features'],
     'testimonials' => ['perm' => 'testimonials.restore', 'endpoint_hint' => 'testimonials'],
+    'cta_banners' => ['perm' => 'cta_banners.restore', 'endpoint_hint' => 'cta-banners'],
+    'partners' => ['perm' => 'partners.restore', 'endpoint_hint' => 'partners'],
     'social_links' => ['perm' => 'contact_social.restore', 'endpoint_hint' => 'social-links'],
     'contact_infos' => ['perm' => 'contact_social.restore', 'endpoint_hint' => 'contact-infos'],
 ];

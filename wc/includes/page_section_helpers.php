@@ -12,6 +12,8 @@ function page_content_section_catalog(): array
     return [
         'services' => 'Services',
         'testimonials' => 'Testimonials',
+        'cta_banner' => 'CTA Banner',
+        'partners' => 'Partners',
         'contact_social' => 'Contact & Social',
         'contact_form' => 'Contact Form',
         'profile_overviews' => 'Profile Overview',

@@ -72,6 +72,10 @@ if (empty($pageRes['success'])) {
     $visionMissions = [];
     $features = [];
     $testimonials = [];
+    $ctaBanners = [];
+    $partners = [];
+    $partnersSectionTitle = 'Our Partners';
+    $partnersSectionSubtitle = '';
     $contactSocial = ['social' => [], 'contact' => null];
 } else {
     $page = $pageRes['data'];
@@ -88,6 +92,16 @@ if (empty($pageRes['success'])) {
     $features = !empty($featuresRes['success']) ? ($featuresRes['data']['items'] ?? []) : [];
     $testimonialsRes = pw_api('/api/public/testimonials', ['page_id' => $page['id']]);
     $testimonials = !empty($testimonialsRes['success']) ? ($testimonialsRes['data']['items'] ?? []) : [];
+    $ctaRes = pw_api('/api/public/cta-banners', ['page_id' => $page['id']]);
+    $ctaBanners = !empty($ctaRes['success']) ? ($ctaRes['data']['items'] ?? []) : [];
+    $partnersRes = pw_api('/api/public/partners', ['page_id' => $page['id']]);
+    $partners = !empty($partnersRes['success']) ? ($partnersRes['data']['items'] ?? []) : [];
+    $partnersSectionTitle = !empty($partnersRes['success'])
+        ? trim((string) ($partnersRes['data']['section_title'] ?? 'Our Partners'))
+        : 'Our Partners';
+    $partnersSectionSubtitle = !empty($partnersRes['success'])
+        ? trim((string) ($partnersRes['data']['section_subtitle'] ?? ''))
+        : '';
     $contactRes = pw_api('/api/public/contact-social', ['page_id' => $page['id']]);
     $contactSocial = !empty($contactRes['success']) ? ($contactRes['data'] ?? ['social' => [], 'contact' => null]) : ['social' => [], 'contact' => null];
 }
@@ -108,6 +122,8 @@ if ($sectionOrder === []) {
     $sectionOrder = [
         ['section_key' => 'services', 'is_enabled' => 1],
         ['section_key' => 'testimonials', 'is_enabled' => 1],
+        ['section_key' => 'cta_banner', 'is_enabled' => 1],
+        ['section_key' => 'partners', 'is_enabled' => 1],
         ['section_key' => 'contact_social', 'is_enabled' => 1],
         ['section_key' => 'profile_overviews', 'is_enabled' => 1],
         ['section_key' => 'vision_missions', 'is_enabled' => 1],
@@ -144,6 +160,7 @@ if (!$showContactFormSection && (string) ($page['template_key'] ?? '') === 'cont
 
 $contactFormError = '';
 $contactFormSuccess = '';
+$contactFormReceipt = null;
 $contactFormValues = [
     'full_name' => '',
     'company_name' => '',
@@ -191,6 +208,41 @@ if (
     $submit = pw_api_post('/api/public/contact-inquiry', $submitPayload);
     if (!empty($submit['success'])) {
         $contactFormSuccess = (string) ($submit['message'] ?? 'Thank you. Your message has been sent.');
+        $serviceLabel = '';
+        $svcId = (int) ($contactFormValues['preferred_service_id'] ?? 0);
+        if ($svcId > 0) {
+            foreach ($allServices as $svc) {
+                if ((int) ($svc['id'] ?? 0) === $svcId) {
+                    $serviceLabel = trim((string) ($svc['title'] ?? ''));
+                    break;
+                }
+            }
+        }
+        $customReceipt = [];
+        foreach ($contactCustomFields as $cf) {
+            $ck = (string) ($cf['field_key'] ?? '');
+            if ($ck === '') {
+                continue;
+            }
+            $cval = trim((string) ($contactFormValues[$ck] ?? ''));
+            if ($cval === '') {
+                continue;
+            }
+            $customReceipt[] = [
+                'label' => (string) ($cf['label'] ?? $ck),
+                'value' => $cval,
+            ];
+        }
+        $contactFormReceipt = [
+            'full_name' => (string) $contactFormValues['full_name'],
+            'company_name' => (string) $contactFormValues['company_name'],
+            'phone' => (string) $contactFormValues['phone'],
+            'email' => (string) $contactFormValues['email'],
+            'preferred_service' => $serviceLabel,
+            'message' => (string) $contactFormValues['message'],
+            'custom' => $customReceipt,
+            'inquiry_id' => (int) (($submit['data']['id'] ?? 0)),
+        ];
         $contactFormValues = [
             'full_name' => '',
             'company_name' => '',
@@ -218,6 +270,14 @@ $profileCount = count($profiles);
 $visionCount = count($visionMissions);
 $featureCount = count($features);
 $testimonialCount = count($testimonials);
+$ctaBannerCount = count($ctaBanners ?? []);
+$partnerCount = count($partners ?? []);
+if (!isset($partnersSectionTitle) || trim((string) $partnersSectionTitle) === '') {
+    $partnersSectionTitle = 'Our Partners';
+}
+if (!isset($partnersSectionSubtitle)) {
+    $partnersSectionSubtitle = '';
+}
 $socialLinks = is_array($contactSocial['social'] ?? null) ? $contactSocial['social'] : [];
 $contactBlock = is_array($contactSocial['contact'] ?? null) ? $contactSocial['contact'] : null;
 $socialCount = count($socialLinks);
@@ -236,6 +296,20 @@ $showSiteFooter = $hasContactBlock || $socialCount > 0;
 
 $brandNameRaw = trim((string) (($contactBlock ?? [])['company_name'] ?? ''));
 $brandLogo = trim((string) (($contactBlock ?? [])['logo_url'] ?? ''));
+if ($brandLogo === '' || $brandNameRaw === '') {
+    $brandFallbackRes = pw_api('/api/public/contact-social', ['slug' => 'home']);
+    $brandFallbackContact = !empty($brandFallbackRes['success'])
+        ? ($brandFallbackRes['data']['contact'] ?? null)
+        : null;
+    if (is_array($brandFallbackContact)) {
+        if ($brandLogo === '') {
+            $brandLogo = trim((string) ($brandFallbackContact['logo_url'] ?? ''));
+        }
+        if ($brandNameRaw === '') {
+            $brandNameRaw = trim((string) ($brandFallbackContact['company_name'] ?? ''));
+        }
+    }
+}
 if ($brandNameRaw === '') {
     $brandNameRaw = (string) pw_env('APP_NAME', 'Public Website');
 }
@@ -310,11 +384,16 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= $title ?> · <?= $siteName ?></title>
+  <?php if ($brandLogo !== ''): ?>
+  <link rel="icon" href="<?= pw_e($brandLogo) ?>" type="image/png">
+  <link rel="shortcut icon" href="<?= pw_e($brandLogo) ?>">
+  <link rel="apple-touch-icon" href="<?= pw_e($brandLogo) ?>">
+  <?php endif; ?>
   <link rel="stylesheet" href="<?= pw_e(pw_url('/assets/css/site.css')) ?>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/v4-shims.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
-<body<?= $bodyClassAttr ?> style="--page-bg: <?= pw_e($pageBg) ?>; --sand: <?= pw_e($pageBg) ?>; --panel: <?= pw_e($cardBg) ?>; --card-bg: <?= pw_e($cardBg) ?>; background: <?= pw_e($pageBg) ?>;">
+<body<?= $bodyClassAttr ?> style="--page-bg: <?= pw_e($pageBg) ?>; --sand: <?= pw_e($pageBg) ?>; --panel: <?= pw_e($cardBg) ?>; --card-bg: <?= pw_e($cardBg) ?>; --nav-active: <?= pw_e($navActive) ?>; background: <?= pw_e($pageBg) ?>;">
   <?php if ($showSiteTopbar): ?>
   <div
     class="site-topbar<?= $headerTransparent ? ' is-transparent' : '' ?>"
@@ -442,16 +521,49 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
         >
           <div class="hero-overlay">
             <div class="hero-copy">
-              <p class="brand"><?= $brandName ?></p>
+              <?php $heroSubtitle = trim((string) ($hero['subtitle'] ?? '')); ?>
+              <?php if ($heroSubtitle !== ''): ?>
+                <p class="hero-subtitle"><?= pw_e($heroSubtitle) ?></p>
+              <?php endif; ?>
               <h1><?= pw_e((string) $hero['title']) ?></h1>
               <?php if (!empty($hero['description'])): ?>
                 <p class="lede"><?= pw_e((string) $hero['description']) ?></p>
               <?php endif; ?>
-              <?php if (!empty($hero['button_text']) && !empty($hero['button_url'])): ?>
-                <a class="cta" href="<?= pw_e(pw_url((string) $hero['button_url'])) ?>"><?= pw_e((string) $hero['button_text']) ?></a>
-              <?php endif; ?>
-              <?php if ((int) ($hero['is_featured'] ?? 0) === 1): ?>
-                <span class="hero-featured-tag">Featured</span>
+              <?php
+              $heroButtons = [];
+              if (!empty($hero['buttons']) && is_array($hero['buttons'])) {
+                  foreach ($hero['buttons'] as $heroButton) {
+                      $buttonLabel = trim((string) ($heroButton['label'] ?? ''));
+                      if ($buttonLabel === '') {
+                          continue;
+                      }
+                      $heroButtons[] = [
+                          'label' => $buttonLabel,
+                          'url' => trim((string) ($heroButton['url'] ?? '')),
+                      ];
+                  }
+              }
+              if (!$heroButtons && trim((string) ($hero['button_text'] ?? '')) !== '') {
+                  $heroButtons[] = [
+                      'label' => trim((string) $hero['button_text']),
+                      'url' => trim((string) ($hero['button_url'] ?? '')),
+                  ];
+              }
+              ?>
+              <?php if ($heroButtons): ?>
+                <div class="hero-actions">
+                  <?php foreach ($heroButtons as $buttonIndex => $heroButton): ?>
+                    <?php
+                    $buttonClass = 'cta' . ($buttonIndex > 0 ? ' cta-secondary' : '');
+                    $buttonHref = pw_public_href($heroButton['url']);
+                    ?>
+                    <?php if ($buttonHref !== ''): ?>
+                      <a class="<?= pw_e($buttonClass) ?>" href="<?= pw_e($buttonHref) ?>"><?= pw_e($heroButton['label']) ?></a>
+                    <?php else: ?>
+                      <span class="<?= pw_e($buttonClass) ?>"><?= pw_e($heroButton['label']) ?></span>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
               <?php endif; ?>
             </div>
           </div>
@@ -499,7 +611,7 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
   <?php endif; ?>
 
   <?php
-  $hasPageData = $heroCount > 0 || $serviceCount > 0 || $profileCount > 0 || $visionCount > 0 || $featureCount > 0 || $testimonialCount > 0 || $contactSocialCount > 0 || $showContactFormSection;
+  $hasPageData = $heroCount > 0 || $serviceCount > 0 || $profileCount > 0 || $visionCount > 0 || $featureCount > 0 || $testimonialCount > 0 || $ctaBannerCount > 0 || $partnerCount > 0 || $contactSocialCount > 0 || $showContactFormSection;
   ?>
   <?php if (!$hasPageData): ?>
   <main class="content<?= $showPageBanner ? '' : ' content-no-hero' ?> content-empty-page">
@@ -573,6 +685,10 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
   <section class="features-section<?= (int)($feature['is_featured'] ?? 0) === 1 ? ' is-featured' : '' ?>" aria-label="<?= pw_e((string)$feature['title']) ?>">
     <div class="features-inner">
       <header class="features-header">
+        <?php $featureMainTitle = trim((string) ($feature['main_title'] ?? '')); ?>
+        <?php if ($featureMainTitle !== ''): ?>
+          <p class="features-main-title"><?= pw_e($featureMainTitle) ?></p>
+        <?php endif; ?>
         <h2 class="features-title"><?= pw_e((string)$feature['title']) ?></h2>
         <?php if (!empty($feature['description'])): ?>
           <p class="features-lede"><?= pw_e((string)$feature['description']) ?></p>
@@ -607,8 +723,11 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
     class="testimonials-section<?= $testimonialCount > 1 ? ' has-multiple' : '' ?>"
     data-testimonials-slider
     aria-roledescription="carousel"
-    aria-label="Testimonials"
+    aria-labelledby="testimonials-heading"
   >
+    <header class="testimonials-header">
+      <h2 id="testimonials-heading" class="testimonials-title">What Clients Say</h2>
+    </header>
     <div class="testimonials-shell">
       <div class="testimonial-card-frame">
         <div class="testimonials-inner">
@@ -653,39 +772,186 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
   </section>
     <?php endif; ?>
 
+    <?php if ($sectionKey === 'cta_banner' && $ctaBannerCount > 0): ?>
+      <?php foreach ($ctaBanners as $cta): ?>
+        <?php
+          $ctaEyebrow = trim((string) ($cta['eyebrow'] ?? ''));
+          $ctaTitle = trim((string) ($cta['title'] ?? ''));
+          $ctaSubtitle = trim((string) ($cta['subtitle'] ?? ''));
+          $ctaPrimaryText = trim((string) ($cta['primary_button_text'] ?? ''));
+          $ctaPrimaryUrl = trim((string) ($cta['primary_button_url'] ?? ''));
+          $ctaSecondaryText = trim((string) ($cta['secondary_button_text'] ?? ''));
+          $ctaSecondaryUrl = trim((string) ($cta['secondary_button_url'] ?? ''));
+          $ctaHeadingId = 'cta-heading-' . (int) ($cta['id'] ?? 0);
+        ?>
+  <section class="cta-banner-section" aria-labelledby="<?= pw_e($ctaHeadingId) ?>">
+    <div class="cta-banner-inner">
+      <div class="cta-banner-copy">
+        <?php if ($ctaEyebrow !== ''): ?>
+          <p class="cta-banner-eyebrow"><?= pw_e($ctaEyebrow) ?></p>
+        <?php endif; ?>
+        <?php if ($ctaTitle !== ''): ?>
+          <h2 id="<?= pw_e($ctaHeadingId) ?>" class="cta-banner-title"><?= pw_e($ctaTitle) ?></h2>
+        <?php endif; ?>
+        <?php if ($ctaSubtitle !== ''): ?>
+          <p class="cta-banner-subtitle"><?= pw_e($ctaSubtitle) ?></p>
+        <?php endif; ?>
+      </div>
+      <?php if ($ctaPrimaryText !== '' || $ctaSecondaryText !== ''): ?>
+        <div class="cta-banner-actions">
+          <?php if ($ctaPrimaryText !== ''): ?>
+            <?php if ($ctaPrimaryUrl !== ''): ?>
+              <a class="cta-banner-btn cta-banner-btn-primary" href="<?= pw_e(pw_public_href($ctaPrimaryUrl)) ?>"><?= pw_e($ctaPrimaryText) ?></a>
+            <?php else: ?>
+              <span class="cta-banner-btn cta-banner-btn-primary"><?= pw_e($ctaPrimaryText) ?></span>
+            <?php endif; ?>
+          <?php endif; ?>
+          <?php if ($ctaSecondaryText !== ''): ?>
+            <?php if ($ctaSecondaryUrl !== ''): ?>
+              <a class="cta-banner-btn cta-banner-btn-secondary" href="<?= pw_e(pw_public_href($ctaSecondaryUrl)) ?>"><?= pw_e($ctaSecondaryText) ?></a>
+            <?php else: ?>
+              <span class="cta-banner-btn cta-banner-btn-secondary"><?= pw_e($ctaSecondaryText) ?></span>
+            <?php endif; ?>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </section>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php if ($sectionKey === 'partners' && $partnerCount > 0): ?>
+  <section class="partners-section" aria-labelledby="partners-heading">
+    <div class="partners-inner">
+      <header class="partners-header">
+        <h2 id="partners-heading" class="partners-title"><?= pw_e((string) $partnersSectionTitle) ?></h2>
+        <?php if (trim((string) $partnersSectionSubtitle) !== ''): ?>
+          <p class="partners-subtitle"><?= pw_e((string) $partnersSectionSubtitle) ?></p>
+        <?php endif; ?>
+      </header>
+      <div class="partners-grid">
+        <?php foreach ($partners as $partner): ?>
+          <?php
+            $pName = trim((string) ($partner['name'] ?? ''));
+            $pCategory = trim((string) ($partner['category'] ?? ''));
+            $pBadge = trim((string) ($partner['badge_text'] ?? ''));
+            $pDesc = trim((string) ($partner['description'] ?? ''));
+            $pUseful = is_array($partner['useful_for_items'] ?? null)
+                ? $partner['useful_for_items']
+                : [];
+            $pBtnText = trim((string) ($partner['button_text'] ?? ''));
+            $pBtnUrl = trim((string) ($partner['button_url'] ?? ''));
+            $pIconHtml = (string) ($partner['icon_html'] ?? '');
+            if ($pIconHtml === '') {
+                $pIconClass = trim((string) ($partner['icon_class_normalized'] ?? $partner['icon_class'] ?? 'fas fa-handshake'));
+                if ($pIconClass === '') {
+                    $pIconClass = 'fas fa-handshake';
+                }
+                if (preg_match('/^fa-[a-z0-9-]+$/i', $pIconClass) === 1) {
+                    $pIconClass = 'fas ' . $pIconClass;
+                }
+                $pIconHtml = '<i class="' . pw_e($pIconClass) . '" aria-hidden="true"></i>';
+            }
+          ?>
+          <article class="partner-card">
+            <div class="partner-card-top">
+              <div class="partner-icon" aria-hidden="true"><?= $pIconHtml ?></div>
+            </div>
+            <div class="partner-card-body">
+              <?php if ($pBadge !== ''): ?>
+                <p class="partner-badge"><?= pw_e($pBadge) ?></p>
+              <?php endif; ?>
+              <?php if ($pName !== ''): ?>
+                <h3 class="partner-name"><?= pw_e($pName) ?></h3>
+              <?php endif; ?>
+              <?php if ($pCategory !== ''): ?>
+                <p class="partner-category"><?= pw_e($pCategory) ?></p>
+              <?php endif; ?>
+              <?php if ($pDesc !== ''): ?>
+                <p class="partner-desc"><?= pw_e($pDesc) ?></p>
+              <?php endif; ?>
+              <?php if ($pUseful !== []): ?>
+                <p class="partner-useful-label">Useful for:</p>
+                <ul class="partner-useful-list">
+                  <?php foreach ($pUseful as $line): ?>
+                    <li><?= pw_e((string) $line) ?></li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php endif; ?>
+              <?php if ($pBtnText !== ''): ?>
+                <?php if ($pBtnUrl !== '' && $pBtnUrl !== '#'): ?>
+                  <a class="partner-cta" href="<?= pw_e(pw_public_href($pBtnUrl)) ?>"><?= pw_e($pBtnText) ?></a>
+                <?php else: ?>
+                  <span class="partner-cta"><?= pw_e($pBtnText) ?></span>
+                <?php endif; ?>
+              <?php endif; ?>
+            </div>
+          </article>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+    <?php endif; ?>
+
     <?php if ($sectionKey === 'services' && $serviceCount > 0): ?>
   <section class="services-section" aria-labelledby="services-heading">
     <div class="services-inner">
-      <h2 id="services-heading">Services</h2>
-      <p class="services-lede">Services linked to this page.</p>
+      <header class="services-header">
+        <p class="services-eyebrow">Truck &amp; NEMT</p>
+        <h2 id="services-heading">Our Dispatching Services</h2>
+        <p class="services-lede">Choose the dispatching service that fits your transportation business.</p>
+      </header>
       <div class="services-grid">
         <?php foreach ($services as $svc): ?>
+          <?php
+          $svcIconHtml = (string) ($svc['icon_html'] ?? '');
+          if ($svcIconHtml === '') {
+              $svcIconClass = trim((string) ($svc['icon_class'] ?? 'fa-truck'));
+              if ($svcIconClass === '') {
+                  $svcIconClass = 'fa-truck';
+              }
+              if (preg_match('/^fa-[a-z0-9-]+$/i', $svcIconClass) === 1) {
+                  $svcIconClass = 'fas ' . $svcIconClass;
+              }
+              $svcIconHtml = '<i class="' . pw_e($svcIconClass) . '" aria-hidden="true"></i>';
+          }
+          $svcCtaText = trim((string) ($svc['button_text'] ?? ''));
+          $svcCtaUrl = trim((string) ($svc['button_url'] ?? ''));
+          if ($svcCtaText === '') {
+              $svcCtaText = 'Learn More';
+          }
+          ?>
           <article class="service-card<?= (int)($svc['is_featured'] ?? 0) === 1 ? ' is-featured' : '' ?>">
-            <?php if (!empty($svc['image_url'])): ?>
-              <img class="service-image" src="<?= pw_e((string)$svc['image_url']) ?>" alt="">
-            <?php endif; ?>
-            <div class="service-body">
-              <?php if ((int)($svc['is_featured'] ?? 0) === 1): ?>
-                <span class="service-badge">Featured</span>
+            <div class="service-media<?= empty($svc['image_url']) ? ' is-empty' : '' ?>">
+              <?php if (!empty($svc['image_url'])): ?>
+                <img class="service-image" src="<?= pw_e((string)$svc['image_url']) ?>" alt="">
               <?php endif; ?>
+            </div>
+            <div class="service-body">
+              <div class="service-icon" aria-hidden="true"><?= $svcIconHtml ?></div>
               <h3><?= pw_e((string)$svc['title']) ?></h3>
               <?php if (!empty($svc['description'])): ?>
-                <p><?= pw_e((string)$svc['description']) ?></p>
+                <p class="service-desc"><?= pw_e((string)$svc['description']) ?></p>
               <?php endif; ?>
               <?php if (!empty($svc['items'])): ?>
                 <ul class="service-items">
                   <?php foreach ($svc['items'] as $item): ?>
                     <li>
-                      <strong><?= pw_e((string)$item['title']) ?></strong>
-                      <?php if (!empty($item['body'])): ?>
-                        <span><?= pw_e((string)$item['body']) ?></span>
-                      <?php endif; ?>
+                      <span class="service-item-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                      <span class="service-item-copy">
+                        <strong><?= pw_e((string)$item['title']) ?></strong>
+                        <?php if (!empty($item['body'])): ?>
+                          <span><?= pw_e((string)$item['body']) ?></span>
+                        <?php endif; ?>
+                      </span>
                     </li>
                   <?php endforeach; ?>
                 </ul>
               <?php endif; ?>
-              <?php if (!empty($svc['button_text']) && !empty($svc['button_url'])): ?>
-                <a class="service-cta" href="<?= pw_e(pw_url((string)$svc['button_url'])) ?>"><?= pw_e((string)$svc['button_text']) ?></a>
+              <?php if ($svcCtaUrl !== ''): ?>
+                <a class="service-cta" href="<?= pw_e(pw_public_href($svcCtaUrl)) ?>"><?= pw_e($svcCtaText) ?></a>
+              <?php else: ?>
+                <span class="service-cta"><?= pw_e($svcCtaText) ?></span>
               <?php endif; ?>
             </div>
           </article>
@@ -704,11 +970,44 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
     <div class="contact-form-wrap">
       <h2 id="contact-form-heading">Send us a message</h2>
       <p class="contact-form-lede">Tell us about your needs and we will get back to you.</p>
-      <?php if ($contactFormSuccess !== ''): ?>
-        <div class="contact-form-alert is-success"><?= pw_e($contactFormSuccess) ?></div>
-      <?php endif; ?>
       <?php if ($contactFormError !== ''): ?>
         <div class="contact-form-alert is-error"><?= pw_e($contactFormError) ?></div>
+      <?php endif; ?>
+      <?php if ($contactFormSuccess !== '' && is_array($contactFormReceipt)): ?>
+        <div class="contact-receipt" role="status" aria-live="polite">
+          <div class="contact-receipt-badge" aria-hidden="true">✓</div>
+          <h3 class="contact-receipt-title">Message sent successfully</h3>
+          <p class="contact-receipt-lede"><?= pw_e($contactFormSuccess) ?> Here is a copy of what you submitted:</p>
+          <dl class="contact-receipt-grid">
+            <?php if ($contactFormReceipt['full_name'] !== ''): ?>
+              <div><dt>Full Name</dt><dd><?= pw_e($contactFormReceipt['full_name']) ?></dd></div>
+            <?php endif; ?>
+            <?php if ($contactFormReceipt['company_name'] !== ''): ?>
+              <div><dt>Company Name</dt><dd><?= pw_e($contactFormReceipt['company_name']) ?></dd></div>
+            <?php endif; ?>
+            <?php if ($contactFormReceipt['phone'] !== ''): ?>
+              <div><dt>Phone Number</dt><dd><?= pw_e($contactFormReceipt['phone']) ?></dd></div>
+            <?php endif; ?>
+            <?php if ($contactFormReceipt['email'] !== ''): ?>
+              <div><dt>Email Address</dt><dd><?= pw_e($contactFormReceipt['email']) ?></dd></div>
+            <?php endif; ?>
+            <?php if ($contactFormReceipt['preferred_service'] !== ''): ?>
+              <div><dt>Preferred Service</dt><dd><?= pw_e($contactFormReceipt['preferred_service']) ?></dd></div>
+            <?php endif; ?>
+            <?php foreach ($contactFormReceipt['custom'] as $row): ?>
+              <div><dt><?= pw_e((string) $row['label']) ?></dt><dd><?= pw_e((string) $row['value']) ?></dd></div>
+            <?php endforeach; ?>
+            <?php if ($contactFormReceipt['message'] !== ''): ?>
+              <div class="contact-receipt-full"><dt>Comments / Message</dt><dd><?= nl2br(pw_e($contactFormReceipt['message'])) ?></dd></div>
+            <?php endif; ?>
+          </dl>
+          <?php if ((int) ($contactFormReceipt['inquiry_id'] ?? 0) > 0): ?>
+            <p class="contact-receipt-ref">Reference #<?= (int) $contactFormReceipt['inquiry_id'] ?></p>
+          <?php endif; ?>
+          <a class="contact-receipt-again" href="<?= pw_e(pw_url('/' . ltrim((string) ($page['slug'] ?? 'contact-us'), '/'))) ?>">Send another message</a>
+        </div>
+      <?php elseif ($contactFormSuccess !== ''): ?>
+        <div class="contact-form-alert is-success"><?= pw_e($contactFormSuccess) ?></div>
       <?php endif; ?>
       <?php if ($contactFormSuccess === ''): ?>
       <form method="post" class="contact-form" novalidate>

@@ -34,6 +34,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $res = wa_api('POST', '/api/features/update', [
                 'id' => $id,
                 'title' => (string) $p['title'],
+                'main_title' => (string) ($p['main_title'] ?? ''),
                 'description' => (string) ($p['description'] ?? ''),
                 'sort_order' => (int) $p['sort_order'],
                 'is_active' => ((int) $p['is_active'] === 1) ? 0 : 1,

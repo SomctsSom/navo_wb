@@ -34,6 +34,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'id' => (string) $id,
                 'title' => (string) $s['title'],
                 'description' => (string) ($s['description'] ?? ''),
+                'icon_class' => (string) ($s['icon_class'] ?? 'fa-truck'),
                 'button_text' => (string) ($s['button_text'] ?? ''),
                 'button_url' => (string) ($s['button_url'] ?? ''),
                 'sort_order' => (string) $s['sort_order'],

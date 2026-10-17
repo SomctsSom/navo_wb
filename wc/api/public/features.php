@@ -30,7 +30,7 @@ if (!$page) {
 }
 
 $stmt = $pdo->prepare(
-    "SELECT f.id, f.title, f.description, f.sort_order AS feature_sort,
+    "SELECT f.id, f.title, f.main_title, f.description, f.sort_order AS feature_sort,
             fp.is_featured, fp.sort_order AS page_sort
      FROM feature_pages fp
      JOIN features f ON f.id = fp.feature_id

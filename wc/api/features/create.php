@@ -7,6 +7,7 @@ auth_verify_csrf($actor);
 
 $input = array_merge(request_input(), $_POST);
 $title = trim((string) ($input['title'] ?? ''));
+$mainTitle = trim((string) ($input['main_title'] ?? ''));
 $description = trim((string) ($input['description'] ?? ''));
 $sortOrder = (int) ($input['sort_order'] ?? 0);
 $isActive = array_key_exists('is_active', $input) ? to_bool_int($input['is_active'], 1) : 1;
@@ -24,16 +25,20 @@ if (!is_array($cards)) {
 if ($title === '') {
     json_error('Title is required', 422);
 }
+if (mb_strlen($mainTitle) > 200) {
+    json_error('Main title must be 200 characters or less', 422);
+}
 
 $pdo = db();
 $pdo->beginTransaction();
 try {
     $stmt = $pdo->prepare(
-        'INSERT INTO features (title, description, sort_order, is_active, created_at, created_by)
-         VALUES (:title, :description, :sort, :active, :created, :by)'
+        'INSERT INTO features (title, main_title, description, sort_order, is_active, created_at, created_by)
+         VALUES (:title, :main_title, :description, :sort, :active, :created, :by)'
     );
     $stmt->execute([
         ':title' => $title,
+        ':main_title' => $mainTitle !== '' ? $mainTitle : null,
         ':description' => $description !== '' ? $description : null,
         ':sort' => $sortOrder,
         ':active' => $isActive,

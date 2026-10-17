@@ -19,6 +19,9 @@ ob_start();
 </div>
 <div class="panel">
   <p>Status: <?= wa_badge((int)$p['is_active']) ?></p>
+  <?php if (!empty($p['main_title'])): ?>
+    <p><strong><?= wa_e((string)$p['main_title']) ?></strong></p>
+  <?php endif; ?>
   <?php if (!empty($p['description'])): ?>
     <p class="muted"><?= wa_e((string)$p['description']) ?></p>
   <?php endif; ?>

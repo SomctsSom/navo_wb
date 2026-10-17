@@ -99,3 +99,15 @@ function pw_url(string $path = '/'): string
     $path = '/' . ltrim($path, '/');
     return $base . ($path === '/' ? '' : $path);
 }
+
+function pw_public_href(string $url): string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $url) === 1) {
+        return $url;
+    }
+    return pw_url($url);
+}

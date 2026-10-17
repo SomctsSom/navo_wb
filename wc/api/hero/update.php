@@ -20,9 +20,25 @@ if (!$existing) {
 }
 
 $title = trim((string) ($input['title'] ?? $existing['title']));
+$subtitle = array_key_exists('subtitle', $input) ? trim((string) $input['subtitle']) : (string) ($existing['subtitle'] ?? '');
 $description = array_key_exists('description', $input) ? trim((string) $input['description']) : (string) $existing['description'];
 $buttonText = array_key_exists('button_text', $input) ? trim((string) $input['button_text']) : (string) $existing['button_text'];
 $buttonUrl = array_key_exists('button_url', $input) ? trim((string) $input['button_url']) : (string) $existing['button_url'];
+$buttons = null;
+if (array_key_exists('buttons_json', $input)) {
+    $decodedButtons = json_decode((string) $input['buttons_json'], true);
+    if (!is_array($decodedButtons)) {
+        json_error('Invalid buttons_json', 422);
+    }
+    try {
+        $buttons = hero_normalize_buttons($decodedButtons);
+    } catch (RuntimeException $e) {
+        json_error($e->getMessage(), 422);
+    }
+    $primaryButton = hero_first_button($buttons);
+    $buttonText = $primaryButton['label'];
+    $buttonUrl = $primaryButton['url'];
+}
 $sortOrder = (int) ($input['sort_order'] ?? $existing['sort_order']);
 $isActive = array_key_exists('is_active', $input) ? to_bool_int($input['is_active'], (int) $existing['is_active']) : (int) $existing['is_active'];
 $pagesJson = (string) ($input['pages_json'] ?? '');
@@ -36,6 +52,9 @@ if ($pagesJson !== '') {
 
 if ($title === '') {
     json_error('Title is required', 422);
+}
+if (mb_strlen($subtitle) > 200) {
+    json_error('Subtitle must be 200 characters or less', 422);
 }
 if ($buttonUrl !== '' && !is_safe_url($buttonUrl)) {
     json_error('Invalid button URL', 422);
@@ -54,10 +73,11 @@ if (isset($_FILES['image']) && (int) ($_FILES['image']['error'] ?? UPLOAD_ERR_NO
 $pdo->beginTransaction();
 try {
     $pdo->prepare(
-        'UPDATE hero SET title = :title, description = :description, image_path = :image, button_text = :bt,
+        'UPDATE hero SET title = :title, subtitle = :subtitle, description = :description, image_path = :image, button_text = :bt,
          button_url = :bu, sort_order = :sort, is_active = :active, updated_at = :u, updated_by = :by WHERE id = :id'
     )->execute([
         ':title' => $title,
+        ':subtitle' => $subtitle !== '' ? $subtitle : null,
         ':description' => $description !== '' ? $description : null,
         ':image' => $imagePath,
         ':bt' => $buttonText !== '' ? $buttonText : null,
@@ -70,6 +90,9 @@ try {
     ]);
     if ($pageAssignments !== null) {
         sync_hero_pages($pdo, $id, $pageAssignments, (int) $actor['id']);
+    }
+    if ($buttons !== null) {
+        sync_hero_buttons($pdo, $id, $buttons, (int) $actor['id']);
     }
     $pdo->commit();
 } catch (Throwable $e) {

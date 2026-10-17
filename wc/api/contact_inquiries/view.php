@@ -19,6 +19,15 @@ $row['id'] = (int) $row['id'];
 $row['preferred_service_id'] = $row['preferred_service_id'] !== null ? (int) $row['preferred_service_id'] : null;
 $row['page_id'] = $row['page_id'] !== null ? (int) $row['page_id'] : null;
 $row['status_label'] = contact_inquiry_status_label((string) $row['status']);
+$row['created_at_display'] = format_display_time($row['created_at'] ?? null);
+$row['replied_at_display'] = !empty($row['replied_at'])
+    ? format_display_time((string) $row['replied_at'])
+    : '';
+$nextStatus = contact_inquiry_next_status((string) ($row['status'] ?? 'new'));
+$row['next_status'] = $nextStatus;
+$row['next_status_label'] = $nextStatus !== null
+    ? contact_inquiry_status_label($nextStatus)
+    : null;
 $row['statuses'] = array_map(
     static fn (string $s): array => ['value' => $s, 'label' => contact_inquiry_status_label($s)],
     contact_inquiry_statuses()

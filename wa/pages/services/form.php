@@ -6,7 +6,7 @@ $isEdit = $id > 0;
 wa_require_perm($isEdit ? 'services.edit' : 'services.create');
 
 $service = [
-    'title' => '', 'description' => '', 'button_text' => '', 'button_url' => '',
+    'title' => '', 'description' => '', 'icon_class' => 'fa-truck', 'button_text' => '', 'button_url' => '',
     'sort_order' => 0, 'is_active' => 1, 'pages' => [], 'items' => [], 'image_url' => null,
 ];
 if ($isEdit) {
@@ -67,6 +67,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $fields = [
         'title' => trim((string) ($_POST['title'] ?? '')),
         'description' => trim((string) ($_POST['description'] ?? '')),
+        'icon_class' => trim((string) ($_POST['icon_class'] ?? 'fa-truck')),
         'button_text' => trim((string) ($_POST['button_text'] ?? '')),
         'button_url' => trim((string) ($_POST['button_url'] ?? '')),
         'sort_order' => (string) ((int) ($_POST['sort_order'] ?? 0)),
@@ -88,6 +89,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $service = array_merge($service, [
         'title' => $fields['title'],
         'description' => $fields['description'],
+        'icon_class' => $fields['icon_class'],
         'button_text' => $fields['button_text'],
         'button_url' => $fields['button_url'],
         'sort_order' => (int) $fields['sort_order'],
@@ -111,6 +113,10 @@ ob_start();
     <label>Title<input name="title" required value="<?= wa_e((string)$service['title']) ?>"></label>
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$service['sort_order'] ?>"></label>
     <label class="full">Description<textarea name="description" rows="3"><?= wa_e((string)($service['description'] ?? '')) ?></textarea></label>
+    <label>Icon class
+      <input name="icon_class" value="<?= wa_e((string)($service['icon_class'] ?? 'fa-truck')) ?>" placeholder="fa-truck" maxlength="100">
+      <span class="muted" style="display:block;margin-top:0.35rem">Font Awesome class, e.g. <code>fa-truck</code> or <code>fas fa-ambulance</code>.</span>
+    </label>
     <label>Button text<input name="button_text" value="<?= wa_e((string)($service['button_text'] ?? '')) ?>"></label>
     <label>Button URL<input name="button_url" value="<?= wa_e((string)($service['button_url'] ?? '')) ?>"></label>
     <label>Image (optional)

@@ -45,6 +45,8 @@ return [
         'footer_colors',
         'website_header',
         'testimonials',
+        'cta',
+        'partners',
         'contact_social',
         'contact_form',
         'contact_inquiries',

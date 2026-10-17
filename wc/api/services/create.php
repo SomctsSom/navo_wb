@@ -8,6 +8,7 @@ auth_verify_csrf($actor);
 $input = array_merge(request_input(), $_POST);
 $title = trim((string) ($input['title'] ?? ''));
 $description = trim((string) ($input['description'] ?? ''));
+$iconClass = service_normalize_icon_class($input['icon_class'] ?? service_default_icon_class());
 $buttonText = trim((string) ($input['button_text'] ?? ''));
 $buttonUrl = trim((string) ($input['button_url'] ?? ''));
 $sortOrder = (int) ($input['sort_order'] ?? 0);
@@ -44,12 +45,13 @@ $pdo = db();
 $pdo->beginTransaction();
 try {
     $stmt = $pdo->prepare(
-        'INSERT INTO services (title, description, image_path, button_text, button_url, sort_order, is_active, created_at, created_by)
-         VALUES (:title, :description, :image, :bt, :bu, :sort, :active, :created, :by)'
+        'INSERT INTO services (title, description, icon_class, image_path, button_text, button_url, sort_order, is_active, created_at, created_by)
+         VALUES (:title, :description, :icon, :image, :bt, :bu, :sort, :active, :created, :by)'
     );
     $stmt->execute([
         ':title' => $title,
         ':description' => $description !== '' ? $description : null,
+        ':icon' => $iconClass,
         ':image' => $imagePath,
         ':bt' => $buttonText !== '' ? $buttonText : null,
         ':bu' => $buttonUrl !== '' ? $buttonUrl : null,

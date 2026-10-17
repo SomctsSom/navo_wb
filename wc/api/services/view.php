@@ -17,6 +17,8 @@ if (!$row) {
 }
 $row['id'] = (int) $row['id'];
 $row['is_active'] = (int) $row['is_active'];
+$row['icon_class'] = service_normalize_icon_class($row['icon_class'] ?? service_default_icon_class());
+$row['icon_html'] = feature_icon_html($row['icon_class']);
 $row['image_url'] = $row['image_path'] ? secure_public_media_url($row['image_path']) : null;
 $ps = $pdo->prepare(
     'SELECT sp.id AS service_page_id, sp.page_id, sp.is_featured, sp.is_active, sp.sort_order, p.title, p.slug, p.page_type

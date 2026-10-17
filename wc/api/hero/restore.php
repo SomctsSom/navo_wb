@@ -36,5 +36,13 @@ foreach ($hps->fetchAll(PDO::FETCH_COLUMN) ?: [] as $hpId) {
     restore_row($pdo, 'hero_pages', (int) $hpId, (int) $actor['id']);
 }
 
+if (table_exists($pdo, 'hero_buttons')) {
+    $btns = $pdo->prepare('SELECT id FROM hero_buttons WHERE hero_id = :id AND deleted_at IS NOT NULL');
+    $btns->execute([':id' => $id]);
+    foreach ($btns->fetchAll(PDO::FETCH_COLUMN) ?: [] as $buttonId) {
+        restore_row($pdo, 'hero_buttons', (int) $buttonId, (int) $actor['id']);
+    }
+}
+
 audit_log((int) $actor['id'], 'restore', 'hero', $id);
 json_ok(['id' => $id], 'Hero restored');

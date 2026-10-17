@@ -27,5 +27,6 @@ $ps = $pdo->prepare(
 );
 $ps->execute([':id' => $id]);
 $row['pages'] = $ps->fetchAll() ?: [];
+$row['buttons'] = hero_buttons_or_legacy($row, hero_load_buttons($pdo, $id));
 $row['created_at_display'] = format_display_time($row['created_at']);
 json_ok($row);
