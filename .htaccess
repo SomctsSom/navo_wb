@@ -1,8 +1,20 @@
-# Point domain document root to this folder when possible.
-# If the host serves the repo root instead, keep apps under /pw/public, /wa/public, /wc/public.
+# Domain document root = this folder (repo root containing pw/, wa/, wc/).
+# LiteSpeed / Apache
 
+<IfModule mod_rewrite.c>
 RewriteEngine On
 
-# Prefer public website as the site homepage when this file is at the domain root.
+# Keep app trees self-contained (their own public/.htaccess handles routing)
+RewriteRule ^(pw|wa|wc)(/|$) - [L]
+
+# Hide sensitive paths
+RewriteRule ^(\.env|.*\.env)$ - [F,L]
+RewriteRule ^(pw|wa|wc)/(\.env|.*\.env)$ - [F,L]
+
+# Homepage and all other public URLs → Public Website front controller
 RewriteRule ^$ pw/public/ [L]
-RewriteRule ^index\.php$ pw/public/ [L]
+RewriteRule ^(.*)$ pw/public/$1 [L]
+</IfModule>
+
+DirectoryIndex pw/public/index.php index.php
+Options -Indexes

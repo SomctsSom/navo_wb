@@ -1,13 +1,18 @@
+# Website Core API front controller (hosted at /wc/public/)
+<IfModule mod_rewrite.c>
 RewriteEngine On
+RewriteBase /wc/public/
 
-# Preserve Authorization header
+# Preserve Authorization header (Bearer tokens)
 RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-# Serve existing files as-is
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Front controller
-RewriteRule ^ index.php [L]
+RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+DirectoryIndex index.php
+Options -Indexes

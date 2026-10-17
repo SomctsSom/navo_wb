@@ -17,6 +17,10 @@ try {
     if ($path === '/health') {
         json_ok(['status' => 'ok', 'app' => app_config('name'), 'time' => now_utc()]);
     }
+    if ($path === '/health/db') {
+        require dirname(__DIR__) . '/api/public/health_db.php';
+        exit;
+    }
 
     if (preg_match('#^/media/(.+)$#', $path, $m) === 1) {
         require dirname(__DIR__) . '/api/public/media.php';
