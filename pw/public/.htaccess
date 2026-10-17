@@ -1,5 +1,14 @@
+# Public Website front controller (hosted at /pw/public/)
+<IfModule mod_rewrite.c>
 RewriteEngine On
+RewriteBase /pw/public/
+
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
-RewriteRule ^ index.php [L]
+
+RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+DirectoryIndex index.php
+Options -Indexes
