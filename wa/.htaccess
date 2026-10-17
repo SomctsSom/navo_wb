@@ -1,7 +1,6 @@
-# Deny web access to env and PHP sources outside public/
-<IfModule mod_authz_core.c>
-  Require all denied
-</IfModule>
-<IfModule !mod_authz_core.c>
-  Deny from all
+# Block direct web access to everything under wa/ except public/
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^public(/|$) - [L]
+RewriteRule ^ - [F,L]
 </IfModule>
