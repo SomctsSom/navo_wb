@@ -21,6 +21,8 @@ $allowed = [
     'vision_missions' => ['table' => 'vision_missions', 'label' => 'title', 'extra' => 'statement_type'],
     'features' => ['table' => 'features', 'label' => 'title', 'extra' => 'description'],
     'testimonials' => ['table' => 'testimonials', 'label' => 'author_name', 'extra' => 'quote'],
+    'cta_banners' => ['table' => 'cta_banners', 'label' => 'title', 'extra' => 'subtitle'],
+    'partners' => ['table' => 'partners', 'label' => 'name', 'extra' => 'category'],
     'social_links' => ['table' => 'social_links', 'label' => 'label', 'extra' => 'link_url'],
     'contact_infos' => ['table' => 'contact_infos', 'label' => 'company_summary', 'extra' => 'id'],
 ];

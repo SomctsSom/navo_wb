@@ -21,6 +21,13 @@ $hps->execute([':id' => $id]);
 foreach ($hps->fetchAll(PDO::FETCH_COLUMN) ?: [] as $hpId) {
     soft_delete_row($pdo, 'hero_pages', (int) $hpId, (int) $actor['id']);
 }
+if (table_exists($pdo, 'hero_buttons')) {
+    $btns = $pdo->prepare('SELECT id FROM hero_buttons WHERE hero_id = :id AND deleted_at IS NULL');
+    $btns->execute([':id' => $id]);
+    foreach ($btns->fetchAll(PDO::FETCH_COLUMN) ?: [] as $buttonId) {
+        soft_delete_row($pdo, 'hero_buttons', (int) $buttonId, (int) $actor['id']);
+    }
+}
 
 if (!soft_delete_row($pdo, 'hero', $id, (int) $actor['id'])) {
     json_error('Soft delete failed', 500);

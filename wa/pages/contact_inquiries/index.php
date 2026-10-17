@@ -29,74 +29,86 @@ $res = wa_api('GET', '/api/contact-inquiries', [
 $items = wa_api_ok($res) ? ($res['data']['items'] ?? []) : [];
 $pagination = wa_api_ok($res) ? ($res['data']['pagination'] ?? []) : [];
 $statuses = wa_api_ok($res) ? ($res['data']['statuses'] ?? []) : [];
+$total = (int) ($pagination['total'] ?? count($items));
 
 ob_start();
 ?>
 <div class="page-head">
   <div>
     <h1>Contact Inquiries</h1>
-    <p>Messages submitted from the public Contact Us form.</p>
+    <p>Messages submitted from the public Contact Us form<?= $total > 0 ? ' · ' . $total . ' total' : '' ?>.</p>
   </div>
-  <div style="display:flex;gap:0.5rem">
+  <div class="actions" style="margin-top:0">
     <?php if (wa_can('contact_form.view')): ?>
       <a class="btn btn-ghost" href="<?= wa_e(wa_url('/contact-form')) ?>">Form settings</a>
     <?php endif; ?>
   </div>
 </div>
 <div class="panel">
-  <form method="get" class="form-grid" style="margin-bottom:1rem">
-    <label>Search<input name="q" value="<?= wa_e($q) ?>" placeholder="Name, email, phone…"></label>
-    <label>Status
-      <select name="status">
-        <option value="">All</option>
-        <?php foreach ($statuses as $st): ?>
-          <option value="<?= wa_e((string) $st['value']) ?>" <?= $status === (string) $st['value'] ? 'selected' : '' ?>><?= wa_e((string) $st['label']) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </label>
-    <div class="actions"><button class="btn" type="submit">Filter</button></div>
+  <form class="toolbar inquiry-toolbar" method="get">
+    <input type="search" name="q" value="<?= wa_e($q) ?>" placeholder="Search name, email, phone…">
+    <select name="status">
+      <option value="">Status: any</option>
+      <?php foreach ($statuses as $st): ?>
+        <option value="<?= wa_e((string) $st['value']) ?>" <?= $status === (string) $st['value'] ? 'selected' : '' ?>><?= wa_e((string) $st['label']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <button class="btn btn-secondary" type="submit">Filter</button>
   </form>
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
+
+  <table class="data inquiry-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Service</th>
+        <th>Status</th>
+        <th>Received</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php if (!$items): ?>
         <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Phone</th>
-          <th>Service</th>
-          <th>Status</th>
-          <th>Received</th>
-          <th></th>
+          <td colspan="7" class="inquiry-empty">No inquiries found.</td>
         </tr>
-      </thead>
-      <tbody>
-        <?php if (!$items): ?>
-          <tr><td colspan="7" class="muted">No inquiries yet.</td></tr>
-        <?php endif; ?>
-        <?php foreach ($items as $row): ?>
-          <tr>
-            <td><?= wa_e((string) ($row['full_name'] ?? '—')) ?></td>
-            <td><?= wa_e((string) ($row['email'] ?? '—')) ?></td>
-            <td><?= wa_e((string) ($row['phone'] ?? '—')) ?></td>
-            <td><?= wa_e((string) ($row['preferred_service_title'] ?? '—')) ?></td>
-            <td><?= wa_e((string) ($row['status_label'] ?? $row['status'] ?? '')) ?></td>
-            <td><?= wa_e((string) ($row['created_at'] ?? '')) ?></td>
-            <td class="row-actions">
-              <a href="<?= wa_e(wa_url('/contact-inquiries/view?id=' . (int) $row['id'])) ?>">View</a>
+      <?php endif; ?>
+      <?php foreach ($items as $row): ?>
+        <?php
+          $stCode = strtolower(trim((string) ($row['status'] ?? 'new')));
+          $stLabel = (string) ($row['status_label'] ?? $row['status'] ?? 'New');
+          $received = (string) ($row['created_at_display'] ?? $row['created_at'] ?? '');
+        ?>
+        <tr>
+          <td>
+            <strong><?= wa_e((string) ($row['full_name'] ?? '—')) ?></strong>
+            <?php if (!empty($row['company_name'])): ?>
+              <div class="muted"><?= wa_e((string) $row['company_name']) ?></div>
+            <?php endif; ?>
+          </td>
+          <td><?= wa_e((string) ($row['email'] ?? '—')) ?></td>
+          <td><?= wa_e((string) ($row['phone'] ?? '—')) ?></td>
+          <td><?= wa_e((string) ($row['preferred_service_title'] ?? '—')) ?></td>
+          <td><span class="inquiry-status inquiry-status-<?= wa_e($stCode) ?>"><?= wa_e($stLabel) ?></span></td>
+          <td class="muted"><?= wa_e($received) ?></td>
+          <td>
+            <div class="inquiry-actions">
+              <a class="btn btn-ghost btn-sm" href="<?= wa_e(wa_url('/contact-inquiries/view?id=' . (int) $row['id'])) ?>">View</a>
               <?php if (wa_can('contact_inquiries.delete')): ?>
-                <form method="post" style="display:inline" onsubmit="return confirm('Delete this inquiry?')">
+                <form class="confirm-form" method="post">
                   <?= wa_csrf_field() ?>
                   <input type="hidden" name="action" value="delete">
                   <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
-                  <button class="linkish danger" type="submit">Delete</button>
+                  <button class="btn btn-danger btn-sm" type="submit" data-confirm="Delete this inquiry?">Delete</button>
                 </form>
               <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
   <?= wa_pagination($pagination, '/contact-inquiries', ['q' => $q, 'status' => $status]) ?>
 </div>
 <?php

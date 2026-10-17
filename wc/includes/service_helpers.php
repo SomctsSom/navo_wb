@@ -1,6 +1,24 @@
 <?php
 declare(strict_types=1);
 
+function service_default_icon_class(): string
+{
+    return 'fa-truck';
+}
+
+function service_normalize_icon_class(mixed $raw): string
+{
+    $raw = trim((string) $raw);
+    if ($raw === '') {
+        $raw = service_default_icon_class();
+    }
+    // Bare glyph names like "fa-truck" need a style prefix for Font Awesome 6.
+    if (preg_match('/^fa-[a-z0-9-]+$/i', $raw) === 1) {
+        $raw = 'fas ' . $raw;
+    }
+    return sanitize_feature_icon_class($raw);
+}
+
 /**
  * @param array<int,array<string,mixed>> $assignments
  */

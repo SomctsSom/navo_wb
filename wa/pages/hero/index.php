@@ -29,6 +29,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $res = wa_api_multipart('/api/hero/update', [
                 'id' => (string) $id,
                 'title' => (string) $h['title'],
+                'subtitle' => (string) ($h['subtitle'] ?? ''),
                 'description' => (string) ($h['description'] ?? ''),
                 'button_text' => (string) ($h['button_text'] ?? ''),
                 'button_url' => (string) ($h['button_url'] ?? ''),
@@ -42,17 +43,15 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     wa_redirect('/hero?' . http_build_query(array_filter([
         'q' => $_GET['q'] ?? null,
         'page_id' => $_GET['page_id'] ?? null,
-        'featured' => $_GET['featured'] ?? null,
         'status' => $_GET['status'] ?? null,
     ], static fn($v) => $v !== null && $v !== '')));
 }
 
 $q = trim((string) ($_GET['q'] ?? ''));
 $pageId = (string) ($_GET['page_id'] ?? '');
-$featured = (string) ($_GET['featured'] ?? '');
 $status = (string) ($_GET['status'] ?? '');
 $res = wa_api('GET', '/api/hero', [
-    'q' => $q, 'page_id' => $pageId, 'featured' => $featured, 'status' => $status,
+    'q' => $q, 'page_id' => $pageId, 'status' => $status,
     'page' => (int) ($_GET['page'] ?? 1),
 ]);
 $items = wa_api_ok($res) ? ($res['data']['items'] ?? []) : [];
@@ -100,11 +99,6 @@ ob_start();
         <option value="<?= (int)$p['id'] ?>" <?= $pageId === (string)$p['id'] ? 'selected' : '' ?>><?= wa_e($p['title']) ?></option>
       <?php endforeach; ?>
     </select>
-    <select name="featured">
-      <option value="">Featured: any</option>
-      <option value="1" <?= $featured==='1'?'selected':'' ?>>Featured</option>
-      <option value="0" <?= $featured==='0'?'selected':'' ?>>Not featured</option>
-    </select>
     <select name="status">
       <option value="">Status: any</option>
       <option value="active" <?= $status==='active'?'selected':'' ?>>Active</option>
@@ -122,7 +116,7 @@ ob_start();
         <td><?= wa_badge((int)$row['is_active']) ?></td>
         <td>
           <?php foreach ($row['pages'] ?? [] as $p): ?>
-            <div><?= wa_e($p['title']) ?> <?= (int)$p['is_featured']===1?'★':'' ?> <?= (int)$p['is_active']===1?'':'(inactive)' ?></div>
+            <div><?= wa_e($p['title']) ?> <?= (int)$p['is_active']===1?'':'(inactive)' ?></div>
           <?php endforeach; ?>
         </td>
         <td><?= (int)($row['page_count'] ?? 0) ?></td>
@@ -139,7 +133,7 @@ ob_start();
     <?php endforeach; ?>
     </tbody>
   </table>
-  <?= wa_pagination($pagination, '/hero', ['q'=>$q,'page_id'=>$pageId,'featured'=>$featured,'status'=>$status]) ?>
+  <?= wa_pagination($pagination, '/hero', ['q'=>$q,'page_id'=>$pageId,'status'=>$status]) ?>
 </div>
 <?php
 wa_render('Hero', ob_get_clean());

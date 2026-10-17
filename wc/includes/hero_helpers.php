@@ -111,3 +111,200 @@ function sync_hero_pages(PDO $pdo, int $heroId, array $assignments, int $actorId
         }
     }
 }
+
+/**
+ * Normalize admin button rows. A label is required; the URL may be empty.
+ * One row is a single button. Several rows are multiple buttons.
+ *
+ * @param array<int,mixed> $items
+ * @return array<int,array{id:int,label:string,url:string,sort_order:int,is_active:int}>
+ */
+function hero_normalize_buttons(array $items): array
+{
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $label = trim((string) ($item['label'] ?? ''));
+        $url = trim((string) ($item['url'] ?? ''));
+        if ($label === '' && $url === '') {
+            continue;
+        }
+        if ($label === '') {
+            throw new RuntimeException('Each hero button needs button text');
+        }
+        if (mb_strlen($label) > 100) {
+            throw new RuntimeException('Button text must be 100 characters or less');
+        }
+        if ($url !== '' && !is_safe_url($url)) {
+            throw new RuntimeException('Invalid button URL');
+        }
+        if (mb_strlen($url) > 255) {
+            throw new RuntimeException('Button URL must be 255 characters or less');
+        }
+        $normalized[] = [
+            'id' => isset($item['id']) ? (int) $item['id'] : 0,
+            'label' => $label,
+            'url' => $url,
+            'sort_order' => count($normalized),
+            'is_active' => to_bool_int($item['is_active'] ?? true, 1),
+        ];
+    }
+    return $normalized;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $buttons
+ * @return array{label:string,url:string}
+ */
+function hero_first_button(array $buttons): array
+{
+    foreach ($buttons as $button) {
+        if ((int) ($button['is_active'] ?? 1) !== 1) {
+            continue;
+        }
+        $label = trim((string) ($button['label'] ?? ''));
+        if ($label === '') {
+            continue;
+        }
+        return [
+            'label' => $label,
+            'url' => trim((string) ($button['url'] ?? '')),
+        ];
+    }
+    return ['label' => '', 'url' => ''];
+}
+
+/**
+ * Replace a hero's buttons. An empty list clears them.
+ * Also keeps hero.button_text / button_url aligned with the first active button.
+ *
+ * @param array<int,array<string,mixed>> $buttons
+ */
+function sync_hero_buttons(PDO $pdo, int $heroId, array $buttons, int $actorId): void
+{
+    $normalized = hero_normalize_buttons($buttons);
+    $keepIds = [];
+    foreach ($normalized as $button) {
+        $url = $button['url'] !== '' ? $button['url'] : null;
+        if ($button['id'] > 0) {
+            $chk = $pdo->prepare('SELECT id FROM hero_buttons WHERE id = :id AND hero_id = :h AND deleted_at IS NULL');
+            $chk->execute([':id' => $button['id'], ':h' => $heroId]);
+            if ($chk->fetchColumn()) {
+                $pdo->prepare(
+                    'UPDATE hero_buttons SET label = :label, url = :url, sort_order = :sort, is_active = :active,
+                     updated_at = :u, updated_by = :by WHERE id = :id'
+                )->execute([
+                    ':label' => $button['label'],
+                    ':url' => $url,
+                    ':sort' => $button['sort_order'],
+                    ':active' => $button['is_active'],
+                    ':u' => now_utc(),
+                    ':by' => $actorId,
+                    ':id' => $button['id'],
+                ]);
+                $keepIds[] = $button['id'];
+                continue;
+            }
+        }
+        $pdo->prepare(
+            'INSERT INTO hero_buttons (hero_id, label, url, sort_order, is_active, created_at, created_by)
+             VALUES (:h, :label, :url, :sort, :active, :c, :by)'
+        )->execute([
+            ':h' => $heroId,
+            ':label' => $button['label'],
+            ':url' => $url,
+            ':sort' => $button['sort_order'],
+            ':active' => $button['is_active'],
+            ':c' => now_utc(),
+            ':by' => $actorId,
+        ]);
+        $keepIds[] = (int) $pdo->lastInsertId();
+    }
+
+    $cur = $pdo->prepare('SELECT id FROM hero_buttons WHERE hero_id = :h AND deleted_at IS NULL');
+    $cur->execute([':h' => $heroId]);
+    foreach ($cur->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+        if (!in_array((int) $id, $keepIds, true)) {
+            soft_delete_row($pdo, 'hero_buttons', (int) $id, $actorId);
+        }
+    }
+
+    $primary = hero_first_button($normalized);
+    $pdo->prepare(
+        'UPDATE hero SET button_text = :bt, button_url = :bu WHERE id = :id'
+    )->execute([
+        ':bt' => $primary['label'] !== '' ? $primary['label'] : null,
+        ':bu' => $primary['url'] !== '' ? $primary['url'] : null,
+        ':id' => $heroId,
+    ]);
+}
+
+/**
+ * @return array<int,array<string,mixed>>
+ */
+function hero_load_buttons(PDO $pdo, int $heroId, bool $activeOnly = false): array
+{
+    $grouped = hero_load_buttons_for($pdo, [$heroId], $activeOnly);
+    return $grouped[$heroId] ?? [];
+}
+
+/**
+ * @param array<int,int> $heroIds
+ * @return array<int,array<int,array<string,mixed>>>
+ */
+function hero_load_buttons_for(PDO $pdo, array $heroIds, bool $activeOnly = false): array
+{
+    $heroIds = array_values(array_unique(array_filter(array_map('intval', $heroIds), static fn(int $id): bool => $id > 0)));
+    if (!$heroIds || !table_exists($pdo, 'hero_buttons')) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($heroIds), '?'));
+    $sql = "SELECT id, hero_id, label, url, sort_order, is_active
+            FROM hero_buttons
+            WHERE deleted_at IS NULL AND hero_id IN ({$placeholders})";
+    if ($activeOnly) {
+        $sql .= ' AND is_active = 1';
+    }
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($heroIds);
+    $grouped = [];
+    foreach ($stmt->fetchAll() ?: [] as $row) {
+        $heroId = (int) $row['hero_id'];
+        $grouped[$heroId][] = [
+            'id' => (int) $row['id'],
+            'label' => (string) $row['label'],
+            'url' => (string) ($row['url'] ?? ''),
+            'sort_order' => (int) $row['sort_order'],
+            'is_active' => (int) $row['is_active'],
+        ];
+    }
+    return $grouped;
+}
+
+/**
+ * Buttons saved on the hero, or the original single button when no rows exist yet.
+ *
+ * @param array<string,mixed> $hero
+ * @param array<int,array<string,mixed>> $buttons
+ * @return array<int,array<string,mixed>>
+ */
+function hero_buttons_or_legacy(array $hero, array $buttons): array
+{
+    if ($buttons) {
+        return $buttons;
+    }
+    $label = trim((string) ($hero['button_text'] ?? ''));
+    if ($label === '') {
+        return [];
+    }
+    return [[
+        'id' => 0,
+        'label' => $label,
+        'url' => trim((string) ($hero['button_url'] ?? '')),
+        'sort_order' => 0,
+        'is_active' => 1,
+    ]];
+}

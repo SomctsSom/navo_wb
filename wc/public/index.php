@@ -153,6 +153,22 @@ try {
         'POST /api/testimonials/restore' => 'testimonials/restore.php',
         'POST /api/testimonials/reorder' => 'testimonials/reorder.php',
 
+        // CTA Banners
+        'GET /api/cta-banners' => 'cta_banners/list.php',
+        'GET /api/cta-banners/view' => 'cta_banners/view.php',
+        'POST /api/cta-banners/create' => 'cta_banners/create.php',
+        'POST /api/cta-banners/update' => 'cta_banners/update.php',
+        'POST /api/cta-banners/delete' => 'cta_banners/delete.php',
+        'POST /api/cta-banners/restore' => 'cta_banners/restore.php',
+
+        // Partners
+        'GET /api/partners' => 'partners/list.php',
+        'GET /api/partners/view' => 'partners/view.php',
+        'POST /api/partners/create' => 'partners/create.php',
+        'POST /api/partners/update' => 'partners/update.php',
+        'POST /api/partners/delete' => 'partners/delete.php',
+        'POST /api/partners/restore' => 'partners/restore.php',
+
         // Contact & Social
         'GET /api/social-links' => 'social_links/list.php',
         'GET /api/social-links/view' => 'social_links/view.php',
@@ -188,6 +204,8 @@ try {
         'GET /api/public/footer-colors' => 'public/footer_colors.php',
         'GET /api/public/website-header' => 'public/website_header.php',
         'GET /api/public/testimonials' => 'public/testimonials.php',
+        'GET /api/public/cta-banners' => 'public/cta_banners.php',
+        'GET /api/public/partners' => 'public/partners.php',
         'GET /api/public/contact-social' => 'public/contact_social.php',
         'GET /api/public/contact-form' => 'public/contact_form.php',
         'POST /api/public/contact-inquiry' => 'public/contact_inquiry.php',

@@ -6,7 +6,7 @@ $isEdit = $id > 0;
 wa_require_perm($isEdit ? 'features.edit' : 'features.create');
 
 $feature = [
-    'title' => '', 'description' => '', 'sort_order' => 0, 'is_active' => 1,
+    'title' => '', 'main_title' => '', 'description' => '', 'sort_order' => 0, 'is_active' => 1,
     'pages' => [], 'cards' => [],
 ];
 if ($isEdit) {
@@ -68,6 +68,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     $fields = [
         'title' => trim((string) ($_POST['title'] ?? '')),
+        'main_title' => trim((string) ($_POST['main_title'] ?? '')),
         'description' => trim((string) ($_POST['description'] ?? '')),
         'sort_order' => (int) ($_POST['sort_order'] ?? 0),
         'is_active' => isset($_POST['is_active']) ? 1 : 0,
@@ -87,6 +88,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $error = (string) ($res['message'] ?? 'Save failed');
     $feature = array_merge($feature, [
         'title' => $fields['title'],
+        'main_title' => $fields['main_title'],
         'description' => $fields['description'],
         'sort_order' => (int) $fields['sort_order'],
         'is_active' => (int) $fields['is_active'],
@@ -106,9 +108,10 @@ ob_start();
 <div class="panel">
   <form method="post" class="form-grid" id="featureForm">
     <?= wa_csrf_field() ?>
-    <label>Title<input name="title" required value="<?= wa_e((string)$feature['title']) ?>" placeholder="Our Values"></label>
+    <label>Title<input name="title" required value="<?= wa_e((string)$feature['title']) ?>" placeholder="Why Choose Navo"></label>
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$feature['sort_order'] ?>"></label>
-    <label class="full">Description<textarea name="description" rows="3" placeholder="Professionalism, communication, organization, and dedication to client success."><?= wa_e((string)($feature['description'] ?? '')) ?></textarea></label>
+    <label class="full">Main title<input name="main_title" maxlength="200" value="<?= wa_e((string)($feature['main_title'] ?? '')) ?>" placeholder="Trusted dispatch support"></label>
+    <label class="full">Description<textarea name="description" rows="3" placeholder="We focus on professional communication, organized operations, and dedicated support for transportation businesses."><?= wa_e((string)($feature['description'] ?? '')) ?></textarea></label>
     <label><span>Active</span><input type="checkbox" name="is_active" value="1" <?= (int)$feature['is_active']===1?'checked':'' ?>></label>
 
     <div class="full">

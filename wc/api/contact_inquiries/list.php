@@ -35,6 +35,7 @@ foreach ($items as &$row) {
     $row['preferred_service_id'] = $row['preferred_service_id'] !== null ? (int) $row['preferred_service_id'] : null;
     $row['page_id'] = $row['page_id'] !== null ? (int) $row['page_id'] : null;
     $row['status_label'] = contact_inquiry_status_label((string) $row['status']);
+    $row['created_at_display'] = format_display_time($row['created_at'] ?? null);
 }
 unset($row);
 

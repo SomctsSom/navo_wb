@@ -12,7 +12,7 @@ $pdo = db();
 
 if ($all) {
     $stmt = $pdo->query(
-        "SELECT s.id, s.title, s.description, s.image_path, s.button_text, s.button_url, s.sort_order
+        "SELECT s.id, s.title, s.description, s.icon_class, s.image_path, s.button_text, s.button_url, s.sort_order
          FROM services s
          WHERE s.deleted_at IS NULL AND s.is_active = 1
          ORDER BY s.sort_order ASC, s.id ASC"
@@ -20,6 +20,8 @@ if ($all) {
     $rows = $stmt ? ($stmt->fetchAll() ?: []) : [];
     foreach ($rows as &$row) {
         $row['id'] = (int) $row['id'];
+        $row['icon_class'] = service_normalize_icon_class($row['icon_class'] ?? service_default_icon_class());
+        $row['icon_html'] = feature_icon_html($row['icon_class']);
         $row['image_url'] = $row['image_path'] ? secure_public_media_url($row['image_path']) : null;
         unset($row['image_path']);
     }
@@ -49,7 +51,7 @@ if (!$page) {
 }
 
 $stmt = $pdo->prepare(
-    "SELECT s.id, s.title, s.description, s.image_path, s.button_text, s.button_url, s.sort_order AS service_sort,
+    "SELECT s.id, s.title, s.description, s.icon_class, s.image_path, s.button_text, s.button_url, s.sort_order AS service_sort,
             sp.is_featured, sp.sort_order AS page_sort
      FROM service_pages sp
      JOIN services s ON s.id = sp.service_id
@@ -63,6 +65,8 @@ $rows = $stmt->fetchAll() ?: [];
 foreach ($rows as &$row) {
     $row['id'] = (int) $row['id'];
     $row['is_featured'] = (int) $row['is_featured'];
+    $row['icon_class'] = service_normalize_icon_class($row['icon_class'] ?? service_default_icon_class());
+    $row['icon_html'] = feature_icon_html($row['icon_class']);
     $row['image_url'] = $row['image_path'] ? secure_public_media_url($row['image_path']) : null;
     unset($row['image_path']);
     $row['items'] = service_load_items($pdo, (int) $row['id'], true);

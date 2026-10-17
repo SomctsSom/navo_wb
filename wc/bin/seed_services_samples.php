@@ -56,6 +56,7 @@ try {
         [
             'title' => 'Customer Support',
             'description' => 'Fast, friendly customer support tailored to your needs.',
+            'icon_class' => 'fa-truck',
             'button_text' => 'Contact us',
             'button_url' => '/about',
             'sort_order' => 10,
@@ -70,6 +71,7 @@ try {
         [
             'title' => 'Technical Support',
             'description' => 'Technical solutions and maintenance for your systems.',
+            'icon_class' => 'fa-truck',
             'button_text' => null,
             'button_url' => null,
             'sort_order' => 20,
@@ -84,6 +86,7 @@ try {
         [
             'title' => 'Business Planning',
             'description' => 'A concise planning service — no list items under the description (optional).',
+            'icon_class' => 'fa-truck',
             'button_text' => 'Read more',
             'button_url' => '/about',
             'sort_order' => 30,
@@ -104,12 +107,13 @@ try {
             seed_service_image($abs, $sample['color'], $sample['title']);
             $rel = 'services/' . $filename;
             $ins = $pdo->prepare(
-                'INSERT INTO services (title, description, image_path, button_text, button_url, sort_order, is_active, created_at)
-                 VALUES (:title, :description, :image, :bt, :bu, :sort, 1, :created)'
+                'INSERT INTO services (title, description, icon_class, image_path, button_text, button_url, sort_order, is_active, created_at)
+                 VALUES (:title, :description, :icon, :image, :bt, :bu, :sort, 1, :created)'
             );
             $ins->execute([
                 ':title' => $sample['title'],
                 ':description' => $sample['description'],
+                ':icon' => $sample['icon_class'] ?? 'fa-truck',
                 ':image' => $rel,
                 ':bt' => $sample['button_text'],
                 ':bu' => $sample['button_url'],
@@ -120,9 +124,10 @@ try {
             echo "Created service #{$serviceId}: {$sample['title']}\n";
         } else {
             $pdo->prepare(
-                'UPDATE services SET description = :d, button_text = :bt, button_url = :bu, sort_order = :sort_order, is_active = 1, updated_at = :u WHERE id = :id'
+                'UPDATE services SET description = :d, icon_class = :icon, button_text = :bt, button_url = :bu, sort_order = :sort_order, is_active = 1, updated_at = :u WHERE id = :id'
             )->execute([
                 ':d' => $sample['description'],
+                ':icon' => $sample['icon_class'] ?? 'fa-truck',
                 ':bt' => $sample['button_text'],
                 ':bu' => $sample['button_url'],
                 ':sort_order' => $sample['sort_order'],

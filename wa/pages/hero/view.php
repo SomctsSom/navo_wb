@@ -19,17 +19,28 @@ ob_start();
 </div>
 <div class="panel">
   <?php if (!empty($h['image_url'])): ?><p><img src="<?= wa_e($h['image_url']) ?>" alt="" style="max-width:100%;border-radius:12px"></p><?php endif; ?>
+  <?php if (trim((string) ($h['subtitle'] ?? '')) !== ''): ?><p><?= wa_e((string) $h['subtitle']) ?></p><?php endif; ?>
   <p><?= wa_e((string)$h['description']) ?></p>
-  <p>Status: <?= wa_badge((int)$h['is_active']) ?> · Button: <?= wa_e((string)($h['button_text'] ?? '—')) ?> → <?= wa_e((string)($h['button_url'] ?? '')) ?></p>
+  <p>Status: <?= wa_badge((int)$h['is_active']) ?></p>
+  <h3>Buttons</h3>
+  <?php $heroButtons = $h['buttons'] ?? []; ?>
+  <?php if (!$heroButtons): ?>
+    <p class="muted">No buttons.</p>
+  <?php else: ?>
+    <ul>
+      <?php foreach ($heroButtons as $button): ?>
+        <li><?= wa_e((string) ($button['label'] ?? '')) ?><?php if (trim((string) ($button['url'] ?? '')) !== ''): ?> → <?= wa_e((string) $button['url']) ?><?php endif; ?></li>
+      <?php endforeach; ?>
+    </ul>
+  <?php endif; ?>
   <h3>Assigned pages</h3>
   <table class="data">
-    <thead><tr><th>Page</th><th>Active</th><th>Featured</th><th>Order</th></tr></thead>
+    <thead><tr><th>Page</th><th>Active</th><th>Order</th></tr></thead>
     <tbody>
     <?php foreach ($h['pages'] ?? [] as $p): ?>
       <tr>
         <td><?= wa_e($p['title']) ?></td>
         <td><?= wa_badge((int)$p['is_active']) ?></td>
-        <td><?= wa_badge((int)$p['is_featured'], 'Featured', 'No') ?></td>
         <td><?= (int)$p['sort_order'] ?></td>
       </tr>
     <?php endforeach; ?>

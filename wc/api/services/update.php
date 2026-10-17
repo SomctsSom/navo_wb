@@ -21,6 +21,9 @@ if (!$existing) {
 
 $title = trim((string) ($input['title'] ?? $existing['title']));
 $description = array_key_exists('description', $input) ? trim((string) $input['description']) : (string) $existing['description'];
+$iconClass = array_key_exists('icon_class', $input)
+    ? service_normalize_icon_class($input['icon_class'])
+    : service_normalize_icon_class($existing['icon_class'] ?? service_default_icon_class());
 $buttonText = array_key_exists('button_text', $input) ? trim((string) $input['button_text']) : (string) $existing['button_text'];
 $buttonUrl = array_key_exists('button_url', $input) ? trim((string) $input['button_url']) : (string) $existing['button_url'];
 $sortOrder = (int) ($input['sort_order'] ?? $existing['sort_order']);
@@ -64,11 +67,12 @@ if (array_key_exists('remove_image', $input) && to_bool_int($input['remove_image
 $pdo->beginTransaction();
 try {
     $pdo->prepare(
-        'UPDATE services SET title = :title, description = :description, image_path = :image, button_text = :bt,
+        'UPDATE services SET title = :title, description = :description, icon_class = :icon, image_path = :image, button_text = :bt,
          button_url = :bu, sort_order = :sort, is_active = :active, updated_at = :u, updated_by = :by WHERE id = :id'
     )->execute([
         ':title' => $title,
         ':description' => $description !== '' ? $description : null,
+        ':icon' => $iconClass,
         ':image' => $imagePath,
         ':bt' => $buttonText !== '' ? $buttonText : null,
         ':bu' => $buttonUrl !== '' ? $buttonUrl : null,

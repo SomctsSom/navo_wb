@@ -21,6 +21,19 @@ function contact_inquiry_status_label(string $status): string
 }
 
 /**
+ * Next status in the workflow: new → in_progress → replied → closed.
+ */
+function contact_inquiry_next_status(string $status): ?string
+{
+    return match ($status) {
+        'new' => 'in_progress',
+        'in_progress' => 'replied',
+        'replied' => 'closed',
+        default => null,
+    };
+}
+
+/**
  * @return array{
  *   show_full_name:int,
  *   show_company_name:int,
