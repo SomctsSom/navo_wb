@@ -8,15 +8,9 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$path = '/' . trim($path, '/');
+$path = wc_request_path();
 if ($path === '/') {
     $path = '/health';
-}
-
-// Strip trailing slash except root
-if ($path !== '/' && str_ends_with($path, '/')) {
-    $path = rtrim($path, '/');
 }
 
 try {
@@ -209,6 +203,7 @@ try {
         'GET /api/public/contact-social' => 'public/contact_social.php',
         'GET /api/public/contact-form' => 'public/contact_form.php',
         'POST /api/public/contact-inquiry' => 'public/contact_inquiry.php',
+        'GET /api/public/branding' => 'public/branding.php',
     ];
 
     $routeKey = request_method() . ' ' . $path;

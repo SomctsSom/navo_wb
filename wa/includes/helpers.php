@@ -35,9 +35,84 @@ function wa_e(?string $v): string
     return htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function wa_script_base_path(): string
+{
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $dir = dirname($script);
+    if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
+        return '';
+    }
+    return rtrim($dir, '/');
+}
+
+function wa_request_is_local_host(): bool
+{
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $host = explode(':', $host)[0];
+    return in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+function wa_url_looks_local(string $url): bool
+{
+    $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+    return $host === '' || in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+function wa_request_origin(): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443')
+        || (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
+    $scheme = $https ? 'https' : 'http';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    return $scheme . '://' . $host;
+}
+
+function wa_request_path(): string
+{
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $path = '/' . trim(str_replace('\\', '/', $path), '/');
+    if ($path === '//') {
+        $path = '/';
+    }
+    $base = wa_script_base_path();
+    if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+        $path = substr($path, strlen($base)) ?: '/';
+        $path = '/' . trim($path, '/');
+        if ($path === '//') {
+            $path = '/';
+        }
+    }
+    if ($path !== '/' && str_ends_with($path, '/')) {
+        $path = rtrim($path, '/');
+    }
+    return $path === '' ? '/' : $path;
+}
+
 function wa_base_url(): string
 {
-    return rtrim((string) wa_env('WA_BASE_URL', ''), '/');
+    $configured = rtrim((string) wa_env('WA_BASE_URL', ''), '/');
+    if ($configured !== '' && !(wa_url_looks_local($configured) && !wa_request_is_local_host())) {
+        return $configured;
+    }
+    return wa_request_origin() . wa_script_base_path();
+}
+
+function wa_wc_api_url(): string
+{
+    $configured = rtrim((string) wa_env('WC_API_URL', ''), '/');
+    if ($configured !== '' && !(wa_url_looks_local($configured) && !wa_request_is_local_host())) {
+        return $configured;
+    }
+    $origin = wa_request_origin();
+    $basePath = wa_script_base_path();
+    if ($basePath !== '' && preg_match('#/wa/public$#', $basePath) === 1) {
+        return $origin . preg_replace('#/wa/public$#', '/wc/public', $basePath);
+    }
+    if ($configured !== '') {
+        return $configured;
+    }
+    return $origin . '/wc/public';
 }
 
 function wa_url(string $path = '/'): string
@@ -71,10 +146,15 @@ function wa_start_session(): void
         return;
     }
     session_name((string) wa_env('SESSION_NAME', 'wms_wa_session'));
+    $cookiePath = wa_script_base_path();
+    if ($cookiePath === '') {
+        $cookiePath = '/';
+    }
     session_set_cookie_params([
         'lifetime' => 0,
-        'path' => '/',
-        'secure' => in_array(strtolower((string) wa_env('COOKIE_SECURE', '0')), ['1', 'true'], true),
+        'path' => $cookiePath,
+        'secure' => in_array(strtolower((string) wa_env('COOKIE_SECURE', '0')), ['1', 'true'], true)
+            || !wa_request_is_local_host(),
         'httponly' => true,
         'samesite' => (string) wa_env('COOKIE_SAMESITE', 'Lax'),
     ]);

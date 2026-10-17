@@ -77,6 +77,78 @@ function request_method(): string
     return strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 }
 
+/**
+ * Directory of the front controller, e.g. "/wc/public" on shared hosting.
+ */
+function wc_script_base_path(): string
+{
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $dir = dirname($script);
+    if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
+        return '';
+    }
+    return rtrim($dir, '/');
+}
+
+function wc_request_is_local_host(): bool
+{
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $host = explode(':', $host)[0];
+    return in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+function wc_url_looks_local(string $url): bool
+{
+    $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+    return $host === '' || in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+function wc_request_origin(): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443')
+        || (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
+    $scheme = $https ? 'https' : 'http';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    return $scheme . '://' . $host;
+}
+
+/**
+ * Public Website Core base URL (no trailing slash).
+ */
+function wc_public_base_url(): string
+{
+    $configured = rtrim((string) app_config('wc_base_url', ''), '/');
+    if ($configured !== '' && !(wc_url_looks_local($configured) && !wc_request_is_local_host())) {
+        return $configured;
+    }
+    return wc_request_origin() . wc_script_base_path();
+}
+
+/**
+ * Normalize REQUEST_URI path relative to this app's public folder.
+ */
+function wc_request_path(): string
+{
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $path = '/' . trim(str_replace('\\', '/', $path), '/');
+    if ($path === '//') {
+        $path = '/';
+    }
+    $base = wc_script_base_path();
+    if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+        $path = substr($path, strlen($base)) ?: '/';
+        $path = '/' . trim($path, '/');
+        if ($path === '//') {
+            $path = '/';
+        }
+    }
+    if ($path !== '/' && str_ends_with($path, '/')) {
+        $path = rtrim($path, '/');
+    }
+    return $path === '' ? '/' : $path;
+}
+
 function request_json(): array
 {
     $raw = file_get_contents('php://input');

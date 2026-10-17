@@ -261,12 +261,83 @@ table.data th { font-size: 0.85rem; color: var(--muted); letter-spacing: 0.02em;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: 1.5rem;
+  padding: 1.5rem 1.6rem 1.65rem;
   box-shadow: var(--shadow);
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.15rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.auth-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #111;
+  padding: 0.35rem;
+  flex: 0 0 auto;
+}
+.auth-brand-text {
+  min-width: 0;
+}
+.auth-company {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.auth-tagline {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 .auth-card h1 {
   font-family: var(--font-display);
   margin: 0 0 0.35rem;
+  font-size: 1.65rem;
+}
+.password-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.password-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 106, 90, 0.12);
+}
+.password-field input {
+  flex: 1 1 auto;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none;
+  box-shadow: none !important;
+  min-width: 0;
+}
+.password-toggle {
+  flex: 0 0 auto;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: #f7f5f1;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0 0.85rem;
+  cursor: pointer;
+}
+.password-toggle:hover {
+  background: #efece5;
 }
 .muted { color: var(--muted); }
 .page-checks {

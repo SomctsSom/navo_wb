@@ -1,0 +1,8 @@
+# Point domain document root to this folder when possible.
+# If the host serves the repo root instead, keep apps under /pw/public, /wa/public, /wc/public.
+
+RewriteEngine On
+
+# Prefer public website as the site homepage when this file is at the domain root.
+RewriteRule ^$ pw/public/ [L]
+RewriteRule ^index\.php$ pw/public/ [L]

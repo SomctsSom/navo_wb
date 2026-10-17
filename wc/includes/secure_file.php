@@ -115,6 +115,6 @@ function secure_resolve_upload_path(string $relative): ?string
 
 function secure_public_media_url(string $relative): string
 {
-    $base = rtrim((string) app_config('wc_base_url', ''), '/');
+    $base = rtrim(wc_public_base_url(), '/');
     return $base . '/media/' . ltrim(str_replace('\\', '/', $relative), '/');
 }
