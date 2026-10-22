@@ -6,7 +6,9 @@ $isEdit = $id > 0;
 wa_require_perm($isEdit ? 'hero.edit' : 'hero.create');
 
 $hero = [
-    'title' => '', 'subtitle' => '', 'description' => '', 'button_text' => '', 'button_url' => '',
+    'title' => '', 'subtitle' => '', 'description' => '',
+    'space_subtitle' => null, 'space_title' => null, 'space_description' => null,
+    'button_text' => '', 'button_url' => '',
     'sort_order' => 0, 'is_active' => 1, 'pages' => [], 'image_url' => null, 'buttons' => [],
 ];
 if ($isEdit) {
@@ -85,6 +87,9 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         'title' => trim((string) ($_POST['title'] ?? '')),
         'subtitle' => trim((string) ($_POST['subtitle'] ?? '')),
         'description' => trim((string) ($_POST['description'] ?? '')),
+        'space_subtitle' => trim((string) ($_POST['space_subtitle'] ?? '')),
+        'space_title' => trim((string) ($_POST['space_title'] ?? '')),
+        'space_description' => trim((string) ($_POST['space_description'] ?? '')),
         'button_text' => (string) ($primaryButton['label'] ?? ''),
         'button_url' => (string) ($primaryButton['url'] ?? ''),
         'sort_order' => (string) ((int) ($_POST['sort_order'] ?? 0)),
@@ -107,6 +112,9 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         'title' => $fields['title'],
         'subtitle' => $fields['subtitle'],
         'description' => $fields['description'],
+        'space_subtitle' => $fields['space_subtitle'] !== '' ? (int) $fields['space_subtitle'] : null,
+        'space_title' => $fields['space_title'] !== '' ? (int) $fields['space_title'] : null,
+        'space_description' => $fields['space_description'] !== '' ? (int) $fields['space_description'] : null,
         'button_text' => $fields['button_text'],
         'button_url' => $fields['button_url'],
         'buttons' => $buttonsPayload,
@@ -131,6 +139,21 @@ ob_start();
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$hero['sort_order'] ?>"></label>
     <label class="full">Subtitle<input name="subtitle" maxlength="200" value="<?= wa_e((string)($hero['subtitle'] ?? '')) ?>" placeholder="Shown above the title"></label>
     <label class="full">Description<textarea name="description" rows="3"><?= wa_e((string)($hero['description'] ?? '')) ?></textarea></label>
+    <div class="full">
+      <strong>Text spacing (px)</strong>
+      <p class="muted">Optional. Leave blank to use the default site spacing. Range 0–120.</p>
+      <div class="page-check" style="grid-template-columns:1fr 1fr 1fr;align-items:end">
+        <label>Space below subtitle
+          <input type="number" name="space_subtitle" min="0" max="120" step="1" value="<?= $hero['space_subtitle'] !== null && $hero['space_subtitle'] !== '' ? (int)$hero['space_subtitle'] : '' ?>" placeholder="default">
+        </label>
+        <label>Space below title
+          <input type="number" name="space_title" min="0" max="120" step="1" value="<?= $hero['space_title'] !== null && $hero['space_title'] !== '' ? (int)$hero['space_title'] : '' ?>" placeholder="default">
+        </label>
+        <label>Space below description
+          <input type="number" name="space_description" min="0" max="120" step="1" value="<?= $hero['space_description'] !== null && $hero['space_description'] !== '' ? (int)$hero['space_description'] : '' ?>" placeholder="default">
+        </label>
+      </div>
+    </div>
     <div class="full">
       <strong>Buttons</strong>
       <p class="muted">Add one button, or several. Each button uses the text and URL saved for this hero. Leave the URL blank to show the label only.</p>

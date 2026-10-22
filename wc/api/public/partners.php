@@ -30,7 +30,7 @@ if (!$page) {
 }
 
 $stmt = $pdo->prepare(
-    "SELECT pr.id, pr.section_title, pr.section_subtitle, pr.icon_class, pr.badge_text, pr.name, pr.category,
+    "SELECT pr.id, pr.section_title, pr.section_subtitle, pr.icon_class, pr.icon_path, pr.badge_text, pr.name, pr.category,
             pr.description, pr.useful_for, pr.button_text, pr.button_url,
             pr.sort_order AS partner_sort, pp.is_featured, pp.sort_order AS page_sort
      FROM partner_pages pp

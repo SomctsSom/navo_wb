@@ -55,6 +55,266 @@ function contact_form_field_defaults(): array
     ];
 }
 
+/**
+ * Allowed public-form widths (Bootstrap 12-column: col-md-N).
+ *
+ * @return list<int>
+ */
+function contact_form_column_widths(): array
+{
+    return [3, 4, 6, 8, 12];
+}
+
+/**
+ * Normalize a width to an allowed Bootstrap col-md span.
+ */
+function contact_form_normalize_column_width(mixed $value, int $default = 6): int
+{
+    $n = (int) $value;
+    if (!in_array($n, contact_form_column_widths(), true)) {
+        return $default;
+    }
+    return $n;
+}
+
+/**
+ * Built-in form fields stored in contact_form_fields (is_system=1).
+ *
+ * @return list<array<string,mixed>>
+ */
+function contact_form_system_field_defs(): array
+{
+    return [
+        [
+            'field_key' => 'full_name',
+            'label' => 'Full Name',
+            'field_type' => 'text',
+            'select_source' => 'manual',
+            'source_table' => null,
+            'source_value_column' => null,
+            'source_label_column' => null,
+            'is_required' => 1,
+            'is_visible' => 1,
+            'sort_order' => 1,
+            'column_width' => 6,
+            'show_key' => 'show_full_name',
+        ],
+        [
+            'field_key' => 'company_name',
+            'label' => 'Company Name',
+            'field_type' => 'text',
+            'select_source' => 'manual',
+            'source_table' => null,
+            'source_value_column' => null,
+            'source_label_column' => null,
+            'is_required' => 0,
+            'is_visible' => 1,
+            'sort_order' => 2,
+            'column_width' => 6,
+            'show_key' => 'show_company_name',
+        ],
+        [
+            'field_key' => 'phone',
+            'label' => 'Phone Number',
+            'field_type' => 'text',
+            'select_source' => 'manual',
+            'source_table' => null,
+            'source_value_column' => null,
+            'source_label_column' => null,
+            'is_required' => 1,
+            'is_visible' => 1,
+            'sort_order' => 4,
+            'column_width' => 4,
+            'show_key' => 'show_phone',
+        ],
+        [
+            'field_key' => 'email',
+            'label' => 'Email Address',
+            'field_type' => 'text',
+            'select_source' => 'manual',
+            'source_table' => null,
+            'source_value_column' => null,
+            'source_label_column' => null,
+            'is_required' => 1,
+            'is_visible' => 1,
+            'sort_order' => 5,
+            'column_width' => 8,
+            'show_key' => 'show_email',
+        ],
+        [
+            'field_key' => 'preferred_service_id',
+            'label' => 'Preferred Service',
+            'field_type' => 'select',
+            'select_source' => 'table',
+            'source_table' => 'services',
+            'source_value_column' => 'id',
+            'source_label_column' => 'title',
+            'is_required' => 1,
+            'is_visible' => 1,
+            'sort_order' => 6,
+            'column_width' => 6,
+            'show_key' => 'show_preferred_service',
+        ],
+        [
+            'field_key' => 'message',
+            'label' => 'Comments / Message',
+            'field_type' => 'textarea',
+            'select_source' => 'manual',
+            'source_table' => null,
+            'source_value_column' => null,
+            'source_label_column' => null,
+            'is_required' => 1,
+            'is_visible' => 1,
+            'sort_order' => 7,
+            'column_width' => 12,
+            'show_key' => 'show_message',
+        ],
+    ];
+}
+
+/**
+ * Ensure built-in fields exist as system rows so sort_order is shared with custom fields.
+ */
+function ensure_contact_form_system_fields(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $hasCol = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'contact_form_fields'
+               AND COLUMN_NAME = 'is_system'"
+        );
+        if (!$hasCol || (int) $hasCol->fetchColumn() < 1) {
+            return;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+
+    $show = contact_form_field_defaults();
+    try {
+        $stmt = $pdo->query(
+            "SELECT setting_key, setting_value FROM site_settings
+             WHERE setting_key IN (
+                'contact_form_show_full_name','contact_form_show_company_name',
+                'contact_form_show_phone','contact_form_show_email',
+                'contact_form_show_preferred_service','contact_form_show_message'
+             )"
+        );
+        $rows = $stmt ? ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: []) : [];
+        $map = [
+            'contact_form_show_full_name' => 'show_full_name',
+            'contact_form_show_company_name' => 'show_company_name',
+            'contact_form_show_phone' => 'show_phone',
+            'contact_form_show_email' => 'show_email',
+            'contact_form_show_preferred_service' => 'show_preferred_service',
+            'contact_form_show_message' => 'show_message',
+        ];
+        foreach ($map as $key => $field) {
+            if (isset($rows[$key])) {
+                $show[$field] = contact_form_bool($rows[$key], 1);
+            }
+        }
+    } catch (Throwable $e) {
+        // ignore
+    }
+
+    $hasWidth = false;
+    try {
+        $wCol = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'contact_form_fields'
+               AND COLUMN_NAME = 'column_width'"
+        );
+        $hasWidth = $wCol && (int) $wCol->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        $hasWidth = false;
+    }
+
+    $chk = $pdo->prepare(
+        'SELECT id FROM contact_form_fields WHERE field_key = :k AND deleted_at IS NULL LIMIT 1'
+    );
+    $insSql = $hasWidth
+        ? 'INSERT INTO contact_form_fields
+            (field_key, label, field_type, select_source, source_table, source_value_column, source_label_column,
+             is_required, is_visible, is_system, sort_order, column_width, created_at)
+         VALUES
+            (:field_key, :label, :field_type, :select_source, :source_table, :source_value_column, :source_label_column,
+             :is_required, :is_visible, 1, :sort_order, :column_width, :created_at)'
+        : 'INSERT INTO contact_form_fields
+            (field_key, label, field_type, select_source, source_table, source_value_column, source_label_column,
+             is_required, is_visible, is_system, sort_order, created_at)
+         VALUES
+            (:field_key, :label, :field_type, :select_source, :source_table, :source_value_column, :source_label_column,
+             :is_required, :is_visible, 1, :sort_order, :created_at)';
+    $ins = $pdo->prepare($insSql);
+    foreach (contact_form_system_field_defs() as $def) {
+        $chk->execute([':k' => $def['field_key']]);
+        if ($chk->fetchColumn()) {
+            continue;
+        }
+        $visible = (int) ($show[$def['show_key']] ?? 1);
+        $params = [
+            ':field_key' => $def['field_key'],
+            ':label' => $def['label'],
+            ':field_type' => $def['field_type'],
+            ':select_source' => $def['select_source'],
+            ':source_table' => $def['source_table'],
+            ':source_value_column' => $def['source_value_column'],
+            ':source_label_column' => $def['source_label_column'],
+            ':is_required' => (int) $def['is_required'],
+            ':is_visible' => $visible,
+            ':sort_order' => (int) $def['sort_order'],
+            ':created_at' => now_utc(),
+        ];
+        if ($hasWidth) {
+            $params[':column_width'] = contact_form_normalize_column_width($def['column_width'] ?? 6);
+        }
+        $ins->execute($params);
+    }
+    $done = true;
+}
+
+/**
+ * Map system field_key → show_* setting key.
+ *
+ * @return array<string,string>
+ */
+function contact_form_system_show_key_map(): array
+{
+    $map = [];
+    foreach (contact_form_system_field_defs() as $def) {
+        $map[(string) $def['field_key']] = (string) $def['show_key'];
+    }
+    return $map;
+}
+
+function contact_form_sync_show_setting_from_system(PDO $pdo, string $fieldKey, int $isVisible, ?int $actorId = null): void
+{
+    $map = contact_form_system_show_key_map();
+    if (!isset($map[$fieldKey])) {
+        return;
+    }
+    $showKey = $map[$fieldKey];
+    $settingKey = 'contact_form_' . $showKey;
+    $val = $isVisible === 1 ? '1' : '0';
+    $pdo->prepare(
+        'INSERT INTO site_settings (setting_key, setting_value, updated_at, updated_by)
+         VALUES (:k, :v, :u, :by)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at), updated_by = VALUES(updated_by)'
+    )->execute([
+        ':k' => $settingKey,
+        ':v' => $val,
+        ':u' => now_utc(),
+        ':by' => $actorId,
+    ]);
+}
+
 function contact_form_bool($value, int $default = 1): int
 {
     if ($value === null || $value === '') {
@@ -113,6 +373,29 @@ function get_contact_form_settings(?PDO $pdo = null): array
     } catch (Throwable $e) {
         // Table may not exist yet
     }
+
+    // Prefer visibility from system field rows when present (shared sort with custom fields).
+    try {
+        ensure_contact_form_system_fields($pdo);
+        $showMap = contact_form_system_show_key_map();
+        $keys = array_keys($showMap);
+        if ($keys) {
+            $in = implode(',', array_fill(0, count($keys), '?'));
+            $stmt = $pdo->prepare(
+                "SELECT field_key, is_visible FROM contact_form_fields
+                 WHERE deleted_at IS NULL AND is_system = 1 AND field_key IN ($in)"
+            );
+            $stmt->execute($keys);
+            foreach ($stmt->fetchAll() ?: [] as $row) {
+                $fk = (string) ($row['field_key'] ?? '');
+                if (isset($showMap[$fk])) {
+                    $defaults[$showMap[$fk]] = (int) ($row['is_visible'] ?? 0) === 1 ? 1 : 0;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        // ignore
+    }
     return $defaults;
 }
 
@@ -145,6 +428,16 @@ function set_contact_form_settings(PDO $pdo, array $input, ?int $actorId = null)
          ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value),
            updated_at = VALUES(updated_at), updated_by = VALUES(updated_by)"
     );
+    ensure_contact_form_system_fields($pdo);
+    $showToFieldKey = [];
+    foreach (contact_form_system_field_defs() as $def) {
+        $showToFieldKey[(string) $def['show_key']] = (string) $def['field_key'];
+    }
+    $updSystem = $pdo->prepare(
+        'UPDATE contact_form_fields
+         SET is_visible = :v, updated_at = :u, updated_by = :by
+         WHERE field_key = :k AND is_system = 1 AND deleted_at IS NULL'
+    );
     foreach ($fields as $field => $key) {
         $val = array_key_exists($field, $input)
             ? contact_form_bool($input[$field], 1)
@@ -156,6 +449,14 @@ function set_contact_form_settings(PDO $pdo, array $input, ?int $actorId = null)
             ':u' => now_utc(),
             ':by' => $actorId,
         ]);
+        if (isset($showToFieldKey[$field])) {
+            $updSystem->execute([
+                ':v' => $val,
+                ':u' => now_utc(),
+                ':by' => $actorId,
+                ':k' => $showToFieldKey[$field],
+            ]);
+        }
     }
     return $out;
 }
@@ -466,6 +767,7 @@ function contact_form_resolve_table_selection(PDO $pdo, array $field, $raw): arr
 function list_contact_form_fields(PDO $pdo, bool $visibleOnly = false): array
 {
     try {
+        ensure_contact_form_system_fields($pdo);
         $sql = 'SELECT * FROM contact_form_fields WHERE deleted_at IS NULL';
         if ($visibleOnly) {
             $sql .= ' AND is_visible = 1';
@@ -523,7 +825,12 @@ function contact_form_field_normalize(array $row, ?PDO $pdo = null): array
         'options_json' => $row['options_json'] ?? null,
         'is_required' => (int) ($row['is_required'] ?? 0),
         'is_visible' => (int) ($row['is_visible'] ?? 1),
+        'is_system' => (int) ($row['is_system'] ?? 0),
         'sort_order' => (int) ($row['sort_order'] ?? 0),
+        'column_width' => contact_form_normalize_column_width(
+            $row['column_width'] ?? (($row['field_type'] ?? '') === 'textarea' ? 12 : 6),
+            ($row['field_type'] ?? '') === 'textarea' ? 12 : 6
+        ),
         'created_at' => $row['created_at'] ?? null,
         'updated_at' => $row['updated_at'] ?? null,
     ];
@@ -605,6 +912,10 @@ function create_contact_form_field(PDO $pdo, array $input, ?int $actorId = null)
     $isRequired = contact_form_bool($input['is_required'] ?? 0, 0);
     $isVisible = contact_form_bool($input['is_visible'] ?? 1, 1);
     $sortOrder = isset($input['sort_order']) ? (int) $input['sort_order'] : 0;
+    $columnWidth = contact_form_normalize_column_width(
+        $input['column_width'] ?? ($fieldType === 'textarea' ? 12 : 6),
+        $fieldType === 'textarea' ? 12 : 6
+    );
 
     $baseKey = contact_form_slugify_key($label);
     $fieldKey = $baseKey;
@@ -678,11 +989,11 @@ function create_contact_form_field(PDO $pdo, array $input, ?int $actorId = null)
             'INSERT INTO contact_form_fields (
                 field_key, label, field_type, select_source, source_table,
                 source_value_column, source_label_column, options_json,
-                is_required, is_visible, sort_order, created_at, created_by
+                is_required, is_visible, sort_order, column_width, created_at, created_by
              ) VALUES (
                 :field_key, :label, :field_type, :select_source, :source_table,
                 :source_value_column, :source_label_column, :options_json,
-                :is_required, :is_visible, :sort_order, :created_at, :created_by
+                :is_required, :is_visible, :sort_order, :column_width, :created_at, :created_by
              )'
         );
         $stmt->execute([
@@ -697,6 +1008,7 @@ function create_contact_form_field(PDO $pdo, array $input, ?int $actorId = null)
             ':is_required' => $isRequired,
             ':is_visible' => $isVisible,
             ':sort_order' => $sortOrder,
+            ':column_width' => $columnWidth,
             ':created_at' => now_utc(),
             ':created_by' => $actorId,
         ]);
@@ -768,6 +1080,9 @@ function update_contact_form_field(PDO $pdo, int $id, array $input, ?int $actorI
     $sortOrder = array_key_exists('sort_order', $input)
         ? (int) $input['sort_order']
         : (int) $existing['sort_order'];
+    $columnWidth = array_key_exists('column_width', $input)
+        ? contact_form_normalize_column_width($input['column_width'], (int) ($existing['column_width'] ?? 6))
+        : contact_form_normalize_column_width($existing['column_width'] ?? 6);
 
     $pdo->prepare(
         'UPDATE contact_form_fields SET
@@ -776,6 +1091,7 @@ function update_contact_form_field(PDO $pdo, int $id, array $input, ?int $actorI
             is_required = :is_required,
             is_visible = :is_visible,
             sort_order = :sort_order,
+            column_width = :column_width,
             updated_at = :updated_at,
             updated_by = :updated_by
          WHERE id = :id'
@@ -785,10 +1101,20 @@ function update_contact_form_field(PDO $pdo, int $id, array $input, ?int $actorI
         ':is_required' => $isRequired,
         ':is_visible' => $isVisible,
         ':sort_order' => $sortOrder,
+        ':column_width' => $columnWidth,
         ':updated_at' => now_utc(),
         ':updated_by' => $actorId,
         ':id' => $id,
     ]);
+
+    if ((int) ($existing['is_system'] ?? 0) === 1) {
+        contact_form_sync_show_setting_from_system(
+            $pdo,
+            (string) $existing['field_key'],
+            $isVisible,
+            $actorId
+        );
+    }
 
     $row = $pdo->prepare('SELECT * FROM contact_form_fields WHERE id = :id LIMIT 1');
     $row->execute([':id' => $id]);
@@ -801,7 +1127,43 @@ function update_contact_form_field(PDO $pdo, int $id, array $input, ?int $actorI
 }
 
 /**
+ * Hide a field on the public form (built-in or custom). Does not soft-delete.
+ *
+ * @return array{ok:bool,error:?string}
+ */
+function hide_contact_form_field(PDO $pdo, int $id, ?int $actorId = null): array
+{
+    if ($id < 1) {
+        return ['ok' => false, 'error' => 'Invalid id'];
+    }
+    $stmt = $pdo->prepare(
+        'SELECT * FROM contact_form_fields WHERE id = :id AND deleted_at IS NULL LIMIT 1'
+    );
+    $stmt->execute([':id' => $id]);
+    $existing = $stmt->fetch();
+    if (!$existing) {
+        return ['ok' => false, 'error' => 'Field not found'];
+    }
+    $now = now_utc();
+    $pdo->prepare(
+        'UPDATE contact_form_fields
+         SET is_visible = 0, updated_at = ?, updated_by = ?
+         WHERE id = ?'
+    )->execute([$now, $actorId, $id]);
+    if ((int) ($existing['is_system'] ?? 0) === 1) {
+        contact_form_sync_show_setting_from_system(
+            $pdo,
+            (string) $existing['field_key'],
+            0,
+            $actorId
+        );
+    }
+    return ['ok' => true, 'error' => null];
+}
+
+/**
  * Soft-delete field definition; does not DROP the inquiry column.
+ * Built-in fields cannot be removed — they are hidden instead.
  *
  * @return array{ok:bool,error:?string}
  */
@@ -811,12 +1173,19 @@ function delete_contact_form_field(PDO $pdo, int $id, ?int $actorId = null): arr
         return ['ok' => false, 'error' => 'Invalid id'];
     }
     $stmt = $pdo->prepare(
-        'SELECT id FROM contact_form_fields WHERE id = :id AND deleted_at IS NULL LIMIT 1'
+        'SELECT * FROM contact_form_fields WHERE id = :id AND deleted_at IS NULL LIMIT 1'
     );
     $stmt->execute([':id' => $id]);
-    if (!$stmt->fetch()) {
+    $existing = $stmt->fetch();
+    if (!$existing) {
         return ['ok' => false, 'error' => 'Field not found'];
     }
+
+    // Built-in fields: hide only (keep row for reorder/update later).
+    if ((int) ($existing['is_system'] ?? 0) === 1) {
+        return hide_contact_form_field($pdo, $id, $actorId);
+    }
+
     $now = now_utc();
     $pdo->prepare(
         'UPDATE contact_form_fields
@@ -970,6 +1339,9 @@ function contact_inquiry_validate(array $input, array $settings, PDO $pdo): arra
     $customFields = list_contact_form_fields($pdo, true);
     $customValues = [];
     foreach ($customFields as $field) {
+        if ((int) ($field['is_system'] ?? 0) === 1) {
+            continue; // built-ins validated above via show_* settings
+        }
         $key = (string) $field['field_key'];
         $raw = $input[$key] ?? ($input['custom'][$key] ?? null);
         $validated = contact_form_validate_custom_value($field, $raw, $pdo);

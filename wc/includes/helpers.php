@@ -79,10 +79,30 @@ function request_method(): string
 
 /**
  * Directory of the front controller, e.g. "/wc/public" on shared hosting.
+ *
+ * Prefer WC_BASE_URL path. PHP's built-in server sets SCRIPT_NAME to the
+ * request URI when using a router, which would incorrectly strip prefixes
+ * like "/media/..." and break media serving.
  */
 function wc_script_base_path(): string
 {
+    $configured = rtrim((string) app_config('wc_base_url', ''), '/');
+    if ($configured !== '') {
+        $urlPath = parse_url($configured, PHP_URL_PATH);
+        if (is_string($urlPath) && $urlPath !== '' && $urlPath !== '/') {
+            return rtrim(str_replace('\\', '/', $urlPath), '/');
+        }
+        return '';
+    }
+
+    if (PHP_SAPI === 'cli-server') {
+        return '';
+    }
+
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($script === '' || !str_ends_with(strtolower($script), '.php')) {
+        return '';
+    }
     $dir = dirname($script);
     if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
         return '';

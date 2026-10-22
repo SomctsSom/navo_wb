@@ -33,9 +33,19 @@ ob_start();
       <tr>
         <td>
           <span style="display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;background:#1f2937;border-radius:8px;color:#f97316">
-            <?= (string)($card['icon_html'] ?? '') ?>
+            <?php if (!empty($card['icon_url'])): ?>
+              <img src="<?= wa_e((string)$card['icon_url']) ?>" alt="" style="width:28px;height:28px;object-fit:contain">
+            <?php else: ?>
+              <?= (string)($card['icon_html'] ?? '') ?>
+            <?php endif; ?>
           </span>
-          <div class="muted" style="font-size:0.8rem;margin-top:0.25rem"><?= wa_e((string)($card['icon_key'] ?? '')) ?></div>
+          <div class="muted" style="font-size:0.8rem;margin-top:0.25rem">
+            <?php if (!empty($card['icon_url'])): ?>
+              Uploaded image
+            <?php else: ?>
+              <?= wa_e((string)($card['icon_key'] ?? '')) ?>
+            <?php endif; ?>
+          </div>
         </td>
         <td><?= wa_e($card['title']) ?></td>
         <td><?= wa_e((string)($card['description'] ?? '')) ?></td>

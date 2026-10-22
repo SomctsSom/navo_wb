@@ -308,3 +308,42 @@ function hero_buttons_or_legacy(array $hero, array $buttons): array
         'is_active' => 1,
     ]];
 }
+
+/**
+ * Normalize optional spacing (px). Empty/null keeps theme default. Range 0–120.
+ */
+function hero_normalize_space_px(mixed $raw): ?int
+{
+    if ($raw === null || $raw === '') {
+        return null;
+    }
+    if (!is_numeric($raw)) {
+        return null;
+    }
+    $n = (int) $raw;
+    if ($n < 0) {
+        $n = 0;
+    }
+    if ($n > 120) {
+        $n = 120;
+    }
+    return $n;
+}
+
+/**
+ * @param array<string,mixed> $row
+ * @return array<string,mixed>
+ */
+function hero_attach_spacing(array $row): array
+{
+    $row['space_subtitle'] = isset($row['space_subtitle']) && $row['space_subtitle'] !== null && $row['space_subtitle'] !== ''
+        ? hero_normalize_space_px($row['space_subtitle'])
+        : null;
+    $row['space_title'] = isset($row['space_title']) && $row['space_title'] !== null && $row['space_title'] !== ''
+        ? hero_normalize_space_px($row['space_title'])
+        : null;
+    $row['space_description'] = isset($row['space_description']) && $row['space_description'] !== null && $row['space_description'] !== ''
+        ? hero_normalize_space_px($row['space_description'])
+        : null;
+    return $row;
+}

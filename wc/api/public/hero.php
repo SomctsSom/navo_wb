@@ -31,7 +31,8 @@ if (!$page) {
 }
 
 $stmt = $pdo->prepare(
-    "SELECT h.id, h.title, h.subtitle, h.description, h.image_path, h.button_text, h.button_url, h.sort_order AS hero_sort,
+    "SELECT h.id, h.title, h.subtitle, h.description, h.space_subtitle, h.space_title, h.space_description,
+            h.image_path, h.button_text, h.button_url, h.sort_order AS hero_sort,
             hp.is_featured, hp.sort_order AS page_sort
      FROM hero_pages hp
      JOIN hero h ON h.id = hp.hero_id
@@ -48,6 +49,7 @@ foreach ($rows as &$row) {
     $row['is_featured'] = (int) $row['is_featured'];
     $row['image_url'] = secure_public_media_url($row['image_path']);
     $row['buttons'] = hero_buttons_or_legacy($row, $buttonMap[$row['id']] ?? []);
+    $row = hero_attach_spacing($row);
     unset($row['image_path']);
 }
 unset($row);

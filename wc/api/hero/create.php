@@ -57,6 +57,10 @@ if (!isset($_FILES['image'])) {
     json_error('Image is required', 422);
 }
 
+$spaceSubtitle = hero_normalize_space_px($input['space_subtitle'] ?? null);
+$spaceTitle = hero_normalize_space_px($input['space_title'] ?? null);
+$spaceDescription = hero_normalize_space_px($input['space_description'] ?? null);
+
 $upload = secure_upload_image($_FILES['image'], 'hero');
 if (!$upload['ok']) {
     json_error($upload['error'], 422);
@@ -66,13 +70,18 @@ $pdo = db();
 $pdo->beginTransaction();
 try {
     $stmt = $pdo->prepare(
-        'INSERT INTO hero (title, subtitle, description, image_path, button_text, button_url, sort_order, is_active, created_at, created_by)
-         VALUES (:title, :subtitle, :description, :image, :bt, :bu, :sort, :active, :created, :by)'
+        'INSERT INTO hero (title, subtitle, description, space_subtitle, space_title, space_description,
+          image_path, button_text, button_url, sort_order, is_active, created_at, created_by)
+         VALUES (:title, :subtitle, :description, :space_sub, :space_title, :space_desc,
+          :image, :bt, :bu, :sort, :active, :created, :by)'
     );
     $stmt->execute([
         ':title' => $title,
         ':subtitle' => $subtitle !== '' ? $subtitle : null,
         ':description' => $description !== '' ? $description : null,
+        ':space_sub' => $spaceSubtitle,
+        ':space_title' => $spaceTitle,
+        ':space_desc' => $spaceDescription,
         ':image' => $upload['relative_path'],
         ':bt' => $buttonText !== '' ? $buttonText : null,
         ':bu' => $buttonUrl !== '' ? $buttonUrl : null,

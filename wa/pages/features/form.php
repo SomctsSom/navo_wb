@@ -48,7 +48,10 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $cardIcons = $_POST['card_icon'] ?? [];
     $cardIds = $_POST['card_id'] ?? [];
     $cardActive = $_POST['card_active'] ?? [];
+    $clearIcons = $_POST['clear_card_icon'] ?? [];
     $cardsPayload = [];
+    $filesMap = [];
+    $payloadIdx = 0;
     if (is_array($cardTitles)) {
         foreach ($cardTitles as $i => $title) {
             $title = trim((string) $title);
@@ -60,9 +63,15 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'icon_key' => trim((string) ($cardIcons[$i] ?? 'fa fa-star')),
                 'title' => $title,
                 'description' => trim((string) ($cardDescs[$i] ?? '')),
-                'sort_order' => (int) $i,
+                'sort_order' => $payloadIdx,
                 'is_active' => isset($cardActive[$i]) ? 1 : 0,
+                'clear_icon' => isset($clearIcons[$i]) ? 1 : 0,
             ];
+            $srcFile = $_FILES['card_icon_' . $i] ?? null;
+            if (is_array($srcFile) && (int) ($srcFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $filesMap['card_icon_' . $payloadIdx] = $srcFile;
+            }
+            $payloadIdx++;
         }
     }
 
@@ -77,9 +86,9 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     ];
     if ($isEdit) {
         $fields['id'] = $id;
-        $res = wa_api('POST', '/api/features/update', $fields);
+        $res = wa_api_multipart('/api/features/update', $fields, $filesMap);
     } else {
-        $res = wa_api('POST', '/api/features/create', $fields);
+        $res = wa_api_multipart('/api/features/create', $fields, $filesMap);
     }
     if (wa_api_ok($res)) {
         wa_flash('success', $res['message'] ?? 'Saved');
@@ -97,6 +106,20 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     foreach ($assignments as $a) {
         $assignedMap[$a['page_id']] = $a;
     }
+    // Preserve icon_url from previous list when re-rendering after error
+    $prevById = [];
+    foreach ($listCards as $prev) {
+        if (!empty($prev['id'])) {
+            $prevById[(int) $prev['id']] = $prev;
+        }
+    }
+    foreach ($cardsPayload as &$cp) {
+        $cid = (int) ($cp['id'] ?? 0);
+        if ($cid > 0 && isset($prevById[$cid]['icon_url']) && empty($cp['clear_icon'])) {
+            $cp['icon_url'] = $prevById[$cid]['icon_url'];
+        }
+    }
+    unset($cp);
     $listCards = $cardsPayload;
 }
 
@@ -106,7 +129,7 @@ ob_start();
   <a class="btn btn-ghost" href="<?= wa_e(wa_url('/features')) ?>">Back</a></div>
 <?php if ($error): ?><div class="alert alert-error"><?= wa_e($error) ?></div><?php endif; ?>
 <div class="panel">
-  <form method="post" class="form-grid" id="featureForm">
+  <form method="post" class="form-grid" id="featureForm" enctype="multipart/form-data">
     <?= wa_csrf_field() ?>
     <label>Title<input name="title" required value="<?= wa_e((string)$feature['title']) ?>" placeholder="Why Choose Navo"></label>
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$feature['sort_order'] ?>"></label>
@@ -116,18 +139,33 @@ ob_start();
 
     <div class="full">
       <strong>Cards</strong>
-      <p class="muted">Add one or many cards. Icon = Font Awesome class, e.g. <code>fa fa-users</code>, <code>fas fa-shield-alt</code>.</p>
+      <p class="muted">Use a Font Awesome class (e.g. <code>fa fa-users</code>) and/or upload an image. Uploaded images display instead of the icon on the public site.</p>
       <div id="cardRows" class="page-checks">
         <?php foreach ($listCards as $idx => $card): ?>
-          <div class="page-check feature-card-row" style="grid-template-columns:12rem 1fr 1.4fr auto auto;align-items:end">
+          <div class="page-check feature-card-row">
             <input type="hidden" name="card_id[]" value="<?= (int)($card['id'] ?? 0) ?>">
-            <label>Icon class
-              <input name="card_icon[]" value="<?= wa_e((string)($card['icon_key'] ?? 'fa fa-star')) ?>" placeholder="fa fa-users" autocomplete="off">
-            </label>
-            <label>Card title<input name="card_title[]" value="<?= wa_e((string)$card['title']) ?>" placeholder="Professionalism"></label>
-            <label>Card description<input name="card_description[]" value="<?= wa_e((string)($card['description'] ?? '')) ?>" placeholder="We represent your operation…"></label>
-            <label>Active <input type="checkbox" name="card_active[<?= (int)$idx ?>]" value="1" <?= ((int)($card['is_active'] ?? 1)===1)?'checked':'' ?>></label>
-            <button type="button" class="btn btn-ghost remove-card" style="padding:0.3rem 0.6rem">Remove</button>
+            <div class="feature-card-row-fields">
+              <label>Icon class
+                <input name="card_icon[]" value="<?= wa_e((string)($card['icon_key'] ?? 'fa fa-star')) ?>" placeholder="fa fa-users" autocomplete="off">
+              </label>
+              <label>Card title<input name="card_title[]" value="<?= wa_e((string)$card['title']) ?>" placeholder="Professionalism"></label>
+              <label>Card description<input name="card_description[]" value="<?= wa_e((string)($card['description'] ?? '')) ?>" placeholder="We represent your operation…"></label>
+            </div>
+            <div class="feature-card-row-meta">
+              <label class="feature-card-image-field">Icon image
+                <?php if (!empty($card['icon_url'])): ?>
+                  <div>
+                    <img src="<?= wa_e((string)$card['icon_url']) ?>" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:6px;background:#1f2937;padding:4px">
+                  </div>
+                  <span style="display:flex;align-items:center;gap:0.35rem;font-weight:400">
+                    <input type="checkbox" name="clear_card_icon[<?= (int)$idx ?>]" value="1"> Remove image
+                  </span>
+                <?php endif; ?>
+                <input type="file" name="card_icon_<?= (int)$idx ?>" accept="image/jpeg,image/png,image/webp,image/gif">
+              </label>
+              <label class="feature-card-active">Active <input type="checkbox" name="card_active[<?= (int)$idx ?>]" value="1" <?= ((int)($card['is_active'] ?? 1)===1)?'checked':'' ?>></label>
+              <button type="button" class="btn btn-ghost remove-card" style="padding:0.3rem 0.6rem">Remove</button>
+            </div>
           </div>
         <?php endforeach; ?>
       </div>
@@ -159,15 +197,22 @@ ob_start();
   </form>
 </div>
 <template id="cardRowTpl">
-  <div class="page-check feature-card-row" style="grid-template-columns:12rem 1fr 1.4fr auto auto;align-items:end">
+  <div class="page-check feature-card-row">
     <input type="hidden" name="card_id[]" value="0">
-    <label>Icon class
-      <input name="card_icon[]" value="fa fa-users" placeholder="fa fa-users" autocomplete="off">
-    </label>
-    <label>Card title<input name="card_title[]" value="" placeholder="Professionalism"></label>
-    <label>Card description<input name="card_description[]" value="" placeholder="We represent your operation…"></label>
-    <label>Active <input type="checkbox" name="card_active[__IDX__]" value="1" checked></label>
-    <button type="button" class="btn btn-ghost remove-card" style="padding:0.3rem 0.6rem">Remove</button>
+    <div class="feature-card-row-fields">
+      <label>Icon class
+        <input name="card_icon[]" value="fa fa-users" placeholder="fa fa-users" autocomplete="off">
+      </label>
+      <label>Card title<input name="card_title[]" value="" placeholder="Professionalism"></label>
+      <label>Card description<input name="card_description[]" value="" placeholder="We represent your operation…"></label>
+    </div>
+    <div class="feature-card-row-meta">
+      <label class="feature-card-image-field">Icon image
+        <input type="file" name="card_icon___IDX__" accept="image/jpeg,image/png,image/webp,image/gif">
+      </label>
+      <label class="feature-card-active">Active <input type="checkbox" name="card_active[__IDX__]" value="1" checked></label>
+      <button type="button" class="btn btn-ghost remove-card" style="padding:0.3rem 0.6rem">Remove</button>
+    </div>
   </div>
 </template>
 <script>

@@ -28,15 +28,24 @@ if ($name === '') {
     json_error('Partner name is required', 422);
 }
 
+$iconPath = null;
+if (isset($_FILES['image']) && (int) ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+    $upload = secure_upload_image($_FILES['image'], 'partners');
+    if (empty($upload['ok'])) {
+        json_error((string) ($upload['error'] ?? 'Image upload failed'), 422);
+    }
+    $iconPath = $upload['relative_path'];
+}
+
 $pdo = db();
 $pdo->beginTransaction();
 try {
     $stmt = $pdo->prepare(
         'INSERT INTO partners (
-            section_title, section_subtitle, icon_class, badge_text, name, category, description, useful_for,
+            section_title, section_subtitle, icon_class, icon_path, badge_text, name, category, description, useful_for,
             button_text, button_url, sort_order, is_active, created_at, created_by
          ) VALUES (
-            :section_title, :section_subtitle, :icon_class, :badge_text, :name, :category, :description, :useful_for,
+            :section_title, :section_subtitle, :icon_class, :icon_path, :badge_text, :name, :category, :description, :useful_for,
             :button_text, :button_url, :sort, :active, :created, :by
          )'
     );
@@ -44,6 +53,7 @@ try {
         ':section_title' => $sectionTitle !== '' ? $sectionTitle : null,
         ':section_subtitle' => $sectionSubtitle !== '' ? $sectionSubtitle : null,
         ':icon_class' => $iconClass !== '' ? $iconClass : null,
+        ':icon_path' => $iconPath,
         ':badge_text' => $badgeText !== '' ? $badgeText : null,
         ':name' => $name,
         ':category' => $category !== '' ? $category : null,

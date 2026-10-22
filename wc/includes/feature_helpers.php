@@ -138,6 +138,34 @@ function sync_feature_pages(PDO $pdo, int $featureId, array $assignments, int $a
 }
 
 /**
+ * Apply uploaded card icon files from $_FILES keys card_icon_{index}.
+ *
+ * @param array<int,array<string,mixed>> $cards
+ * @return array<int,array<string,mixed>>
+ */
+function feature_cards_apply_uploads(array $cards): array
+{
+    foreach ($cards as $i => &$card) {
+        if (!is_array($card)) {
+            continue;
+        }
+        $field = 'card_icon_' . (int) $i;
+        $file = $_FILES[$field] ?? null;
+        if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        $upload = secure_upload_image($file, 'features');
+        if (empty($upload['ok'])) {
+            throw new RuntimeException((string) ($upload['error'] ?? 'Card icon upload failed'));
+        }
+        $card['icon_path'] = $upload['relative_path'];
+        $card['clear_icon'] = 0;
+    }
+    unset($card);
+    return $cards;
+}
+
+/**
  * Sync cards under a feature section. Empty array clears active cards (soft-delete).
  *
  * @param array<int,array<string,mixed>> $cards
@@ -151,9 +179,17 @@ function sync_feature_cards(PDO $pdo, int $featureId, array $cards, int $actorId
         if ($title === '') {
             continue;
         }
+        $clearIcon = to_bool_int($card['clear_icon'] ?? false, 0) === 1;
+        $newPath = array_key_exists('icon_path', $card) ? trim((string) $card['icon_path']) : null;
+        if ($newPath === '') {
+            $newPath = null;
+        }
         $normalized[] = [
             'id' => isset($card['id']) ? (int) $card['id'] : 0,
             'icon_key' => sanitize_feature_icon_class($card['icon_key'] ?? 'fa fa-star'),
+            'icon_path' => $newPath,
+            'clear_icon' => $clearIcon,
+            'has_new_path' => array_key_exists('icon_path', $card),
             'title' => $title,
             'description' => trim((string) ($card['description'] ?? '')),
             'sort_order' => isset($card['sort_order']) ? (int) $card['sort_order'] : $sort,
@@ -165,14 +201,24 @@ function sync_feature_cards(PDO $pdo, int $featureId, array $cards, int $actorId
     $keepIds = [];
     foreach ($normalized as $n) {
         if ($n['id'] > 0) {
-            $chk = $pdo->prepare('SELECT id FROM feature_cards WHERE id = :id AND feature_id = :s AND deleted_at IS NULL');
+            $chk = $pdo->prepare(
+                'SELECT id, icon_path FROM feature_cards WHERE id = :id AND feature_id = :s AND deleted_at IS NULL'
+            );
             $chk->execute([':id' => $n['id'], ':s' => $featureId]);
-            if ($chk->fetchColumn()) {
+            $existingCard = $chk->fetch();
+            if ($existingCard) {
+                $iconPath = $existingCard['icon_path'] ?? null;
+                if ($n['clear_icon']) {
+                    $iconPath = null;
+                } elseif ($n['has_new_path'] && $n['icon_path'] !== null) {
+                    $iconPath = $n['icon_path'];
+                }
                 $pdo->prepare(
-                    'UPDATE feature_cards SET icon_key = :ik, title = :t, description = :d,
+                    'UPDATE feature_cards SET icon_key = :ik, icon_path = :ip, title = :t, description = :d,
                      sort_order = :s, is_active = :a, updated_at = :u, updated_by = :by WHERE id = :id'
                 )->execute([
                     ':ik' => $n['icon_key'],
+                    ':ip' => $iconPath,
                     ':t' => $n['title'],
                     ':d' => $n['description'] !== '' ? $n['description'] : null,
                     ':s' => $n['sort_order'],
@@ -185,12 +231,14 @@ function sync_feature_cards(PDO $pdo, int $featureId, array $cards, int $actorId
                 continue;
             }
         }
+        $iconPath = $n['clear_icon'] ? null : $n['icon_path'];
         $pdo->prepare(
-            'INSERT INTO feature_cards (feature_id, icon_key, title, description, sort_order, is_active, created_at, created_by)
-             VALUES (:fid, :ik, :t, :d, :s, :a, :c, :by)'
+            'INSERT INTO feature_cards (feature_id, icon_key, icon_path, title, description, sort_order, is_active, created_at, created_by)
+             VALUES (:fid, :ik, :ip, :t, :d, :s, :a, :c, :by)'
         )->execute([
             ':fid' => $featureId,
             ':ik' => $n['icon_key'],
+            ':ip' => $iconPath,
             ':t' => $n['title'],
             ':d' => $n['description'] !== '' ? $n['description'] : null,
             ':s' => $n['sort_order'],

@@ -60,6 +60,16 @@ if ($buttonUrl !== '' && !is_safe_url($buttonUrl)) {
     json_error('Invalid button URL', 422);
 }
 
+$spaceSubtitle = array_key_exists('space_subtitle', $input)
+    ? hero_normalize_space_px($input['space_subtitle'])
+    : hero_normalize_space_px($existing['space_subtitle'] ?? null);
+$spaceTitle = array_key_exists('space_title', $input)
+    ? hero_normalize_space_px($input['space_title'])
+    : hero_normalize_space_px($existing['space_title'] ?? null);
+$spaceDescription = array_key_exists('space_description', $input)
+    ? hero_normalize_space_px($input['space_description'])
+    : hero_normalize_space_px($existing['space_description'] ?? null);
+
 $imagePath = $existing['image_path'];
 $newUpload = null;
 if (isset($_FILES['image']) && (int) ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
@@ -73,12 +83,17 @@ if (isset($_FILES['image']) && (int) ($_FILES['image']['error'] ?? UPLOAD_ERR_NO
 $pdo->beginTransaction();
 try {
     $pdo->prepare(
-        'UPDATE hero SET title = :title, subtitle = :subtitle, description = :description, image_path = :image, button_text = :bt,
+        'UPDATE hero SET title = :title, subtitle = :subtitle, description = :description,
+         space_subtitle = :space_sub, space_title = :space_title, space_description = :space_desc,
+         image_path = :image, button_text = :bt,
          button_url = :bu, sort_order = :sort, is_active = :active, updated_at = :u, updated_by = :by WHERE id = :id'
     )->execute([
         ':title' => $title,
         ':subtitle' => $subtitle !== '' ? $subtitle : null,
         ':description' => $description !== '' ? $description : null,
+        ':space_sub' => $spaceSubtitle,
+        ':space_title' => $spaceTitle,
+        ':space_desc' => $spaceDescription,
         ':image' => $imagePath,
         ':bt' => $buttonText !== '' ? $buttonText : null,
         ':bu' => $buttonUrl !== '' ? $buttonUrl : null,

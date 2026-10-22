@@ -9,6 +9,7 @@ $item = [
     'section_title' => '',
     'section_subtitle' => '',
     'icon_class' => 'fa-handshake',
+    'icon_url' => null,
     'badge_text' => 'RECOMMENDED PARTNER — PARTNERSHIP PENDING',
     'name' => '', 'category' => '', 'description' => '', 'useful_for' => '',
     'button_text' => '', 'button_url' => '',
@@ -54,22 +55,41 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         'useful_for' => trim((string) ($_POST['useful_for'] ?? '')),
         'button_text' => trim((string) ($_POST['button_text'] ?? '')),
         'button_url' => trim((string) ($_POST['button_url'] ?? '')),
-        'sort_order' => (int) ($_POST['sort_order'] ?? 0),
-        'is_active' => isset($_POST['is_active']) ? 1 : 0,
+        'sort_order' => (string) ((int) ($_POST['sort_order'] ?? 0)),
+        'is_active' => isset($_POST['is_active']) ? '1' : '0',
         'pages_json' => json_encode($assignments, JSON_UNESCAPED_UNICODE),
     ];
+    if (!empty($_POST['clear_image'])) {
+        $fields['clear_image'] = '1';
+    }
     if ($isEdit) {
-        $fields['id'] = $id;
-        $res = wa_api('POST', '/api/partners/update', $fields);
+        $fields['id'] = (string) $id;
+        $res = wa_api_multipart('/api/partners/update', $fields, $_FILES['image'] ?? []);
     } else {
-        $res = wa_api('POST', '/api/partners/create', $fields);
+        $res = wa_api_multipart('/api/partners/create', $fields, $_FILES['image'] ?? []);
     }
     if (wa_api_ok($res)) {
         wa_flash('success', $res['message'] ?? 'Saved');
         wa_redirect('/partners');
     }
     $error = (string) ($res['message'] ?? 'Save failed');
-    $item = array_merge($item, $fields);
+    $item = array_merge($item, [
+        'section_title' => $fields['section_title'],
+        'section_subtitle' => $fields['section_subtitle'],
+        'icon_class' => $fields['icon_class'],
+        'badge_text' => $fields['badge_text'],
+        'name' => $fields['name'],
+        'category' => $fields['category'],
+        'description' => $fields['description'],
+        'useful_for' => $fields['useful_for'],
+        'button_text' => $fields['button_text'],
+        'button_url' => $fields['button_url'],
+        'sort_order' => (int) $fields['sort_order'],
+        'is_active' => (int) $fields['is_active'],
+    ]);
+    if (!empty($fields['clear_image'])) {
+        $item['icon_url'] = null;
+    }
     $assignedMap = [];
     foreach ($assignments as $a) {
         $assignedMap[$a['page_id']] = $a;
@@ -82,12 +102,25 @@ ob_start();
   <a class="btn btn-ghost" href="<?= wa_e(wa_url('/partners')) ?>">Back</a></div>
 <?php if ($error): ?><div class="alert alert-error"><?= wa_e($error) ?></div><?php endif; ?>
 <div class="panel">
-  <form method="post" class="form-grid">
+  <form method="post" class="form-grid" enctype="multipart/form-data">
     <?= wa_csrf_field() ?>
     <label>Section title<input name="section_title" value="<?= wa_e((string)($item['section_title'] ?? '')) ?>" placeholder="Section title"></label>
     <label>Sub title<input name="section_subtitle" value="<?= wa_e((string)($item['section_subtitle'] ?? '')) ?>" placeholder="Sub title"></label>
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$item['sort_order'] ?>"></label>
-    <label>Icon class<input name="icon_class" value="<?= wa_e((string)($item['icon_class'] ?? '')) ?>" placeholder="fa-handshake"></label>
+    <label>Icon class
+      <input name="icon_class" value="<?= wa_e((string)($item['icon_class'] ?? '')) ?>" placeholder="fa-handshake">
+    </label>
+    <label>Icon / logo image
+      <?php if (!empty($item['icon_url'])): ?>
+        <div style="margin:0.35rem 0">
+          <img src="<?= wa_e((string)$item['icon_url']) ?>" alt="" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#f3f4f6;padding:4px">
+        </div>
+        <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;margin:0 0 0.35rem">
+          <input type="checkbox" name="clear_image" value="1"> Remove image
+        </label>
+      <?php endif; ?>
+      <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
+    </label>
     <label>Badge text<input name="badge_text" value="<?= wa_e((string)($item['badge_text'] ?? '')) ?>" placeholder="RECOMMENDED PARTNER — PARTNERSHIP PENDING"></label>
     <label>Partner name<input name="name" required value="<?= wa_e((string)$item['name']) ?>" placeholder="RouteGenie"></label>
     <label>Category<input name="category" value="<?= wa_e((string)($item['category'] ?? '')) ?>" placeholder="NEMT Software"></label>
