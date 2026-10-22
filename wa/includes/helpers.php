@@ -37,7 +37,24 @@ function wa_e(?string $v): string
 
 function wa_script_base_path(): string
 {
+    $configured = rtrim((string) wa_env('WA_BASE_URL', ''), '/');
+    if ($configured !== '') {
+        $urlPath = parse_url($configured, PHP_URL_PATH);
+        if (is_string($urlPath) && $urlPath !== '' && $urlPath !== '/') {
+            return rtrim(str_replace('\\', '/', $urlPath), '/');
+        }
+        return '';
+    }
+
+    // PHP built-in server sets SCRIPT_NAME to the request URI with a router.
+    if (PHP_SAPI === 'cli-server') {
+        return '';
+    }
+
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($script === '' || !str_ends_with(strtolower($script), '.php')) {
+        return '';
+    }
     $dir = dirname($script);
     if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
         return '';

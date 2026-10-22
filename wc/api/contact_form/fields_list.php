@@ -18,6 +18,7 @@ foreach (contact_form_connectable_tables() as $table => $meta) {
 json_ok([
     'items' => $fields,
     'field_types' => contact_form_custom_field_types(),
+    'column_widths' => contact_form_column_widths(),
     'available_tables' => contact_form_available_connect_tables($pdo),
     'connectable_tables' => $connectable,
 ]);

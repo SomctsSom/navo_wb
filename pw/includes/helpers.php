@@ -42,10 +42,29 @@ function pw_rich(?string $html): string
 
 /**
  * Directory of the front controller, e.g. "/pw/public" when hosted in a subdirectory.
+ *
+ * Prefer PW_BASE_URL path. PHP's built-in server sets SCRIPT_NAME to the
+ * request URI when using a router, which would incorrectly strip path prefixes.
  */
 function pw_script_base_path(): string
 {
+    $configured = rtrim((string) pw_env('PW_BASE_URL', ''), '/');
+    if ($configured !== '') {
+        $urlPath = parse_url($configured, PHP_URL_PATH);
+        if (is_string($urlPath) && $urlPath !== '' && $urlPath !== '/') {
+            return rtrim(str_replace('\\', '/', $urlPath), '/');
+        }
+        return '';
+    }
+
+    if (PHP_SAPI === 'cli-server') {
+        return '';
+    }
+
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($script === '' || !str_ends_with(strtolower($script), '.php')) {
+        return '';
+    }
     $dir = dirname($script);
     if ($dir === '/' || $dir === '\\' || $dir === '.' || $dir === '') {
         return '';
@@ -195,13 +214,18 @@ function pw_url(string $path = '/'): string
     return $base . ($path === '/' ? '' : $path);
 }
 
+function pw_is_external_url(string $url): bool
+{
+    return preg_match('#^https?://#i', trim($url)) === 1;
+}
+
 function pw_public_href(string $url): string
 {
     $url = trim($url);
     if ($url === '') {
         return '';
     }
-    if (preg_match('#^https?://#i', $url) === 1) {
+    if (pw_is_external_url($url)) {
         return $url;
     }
     return pw_url($url);

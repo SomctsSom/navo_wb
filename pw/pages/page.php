@@ -141,11 +141,16 @@ $contactFormSettings = !empty($contactFormSettingsRes['success'])
         'show_email' => 1,
         'show_preferred_service' => 1,
         'show_message' => 1,
+        'fields' => [],
         'custom_fields' => [],
     ];
-$contactCustomFields = is_array($contactFormSettings['custom_fields'] ?? null)
-    ? $contactFormSettings['custom_fields']
+$contactFormFields = is_array($contactFormSettings['fields'] ?? null)
+    ? $contactFormSettings['fields']
     : [];
+if (!$contactFormFields && is_array($contactFormSettings['custom_fields'] ?? null)) {
+    // Legacy fallback if API has no unified fields yet
+    $contactFormFields = $contactFormSettings['custom_fields'];
+}
 $showContactFormSection = false;
 foreach ($sectionOrder as $sec) {
     if (($sec['section_key'] ?? '') === 'contact_form' && (int) ($sec['is_enabled'] ?? 1) === 1) {
@@ -280,6 +285,31 @@ if (!isset($partnersSectionSubtitle)) {
 }
 $socialLinks = is_array($contactSocial['social'] ?? null) ? $contactSocial['social'] : [];
 $contactBlock = is_array($contactSocial['contact'] ?? null) ? $contactSocial['contact'] : null;
+
+$brandNameRaw = trim((string) (($contactBlock ?? [])['company_name'] ?? ''));
+$brandLogo = trim((string) (($contactBlock ?? [])['logo_url'] ?? ''));
+$needsHomeContactFallback = $brandLogo === '' || $brandNameRaw === '' || count($socialLinks) === 0;
+if ($needsHomeContactFallback) {
+    $brandFallbackRes = pw_api('/api/public/contact-social', ['slug' => 'home']);
+    $brandFallbackData = !empty($brandFallbackRes['success']) ? ($brandFallbackRes['data'] ?? null) : null;
+    $brandFallbackContact = is_array($brandFallbackData) ? ($brandFallbackData['contact'] ?? null) : null;
+    if (is_array($brandFallbackContact)) {
+        if ($brandLogo === '') {
+            $brandLogo = trim((string) ($brandFallbackContact['logo_url'] ?? ''));
+        }
+        if ($brandNameRaw === '') {
+            $brandNameRaw = trim((string) ($brandFallbackContact['company_name'] ?? ''));
+        }
+    }
+    // Site-wide topbar/footer social: reuse Home assignments when this page has none.
+    if (count($socialLinks) === 0 && is_array($brandFallbackData)) {
+        $homeSocial = $brandFallbackData['social'] ?? [];
+        if (is_array($homeSocial) && count($homeSocial) > 0) {
+            $socialLinks = $homeSocial;
+        }
+    }
+}
+
 $socialCount = count($socialLinks);
 $hasContactBlock = $contactBlock !== null && (
     trim((string) ($contactBlock['company_summary'] ?? '')) !== ''
@@ -293,23 +323,6 @@ $hasContactBlock = $contactBlock !== null && (
 );
 $contactSocialCount = $socialCount + ($hasContactBlock ? 1 : 0);
 $showSiteFooter = $hasContactBlock || $socialCount > 0;
-
-$brandNameRaw = trim((string) (($contactBlock ?? [])['company_name'] ?? ''));
-$brandLogo = trim((string) (($contactBlock ?? [])['logo_url'] ?? ''));
-if ($brandLogo === '' || $brandNameRaw === '') {
-    $brandFallbackRes = pw_api('/api/public/contact-social', ['slug' => 'home']);
-    $brandFallbackContact = !empty($brandFallbackRes['success'])
-        ? ($brandFallbackRes['data']['contact'] ?? null)
-        : null;
-    if (is_array($brandFallbackContact)) {
-        if ($brandLogo === '') {
-            $brandLogo = trim((string) ($brandFallbackContact['logo_url'] ?? ''));
-        }
-        if ($brandNameRaw === '') {
-            $brandNameRaw = trim((string) ($brandFallbackContact['company_name'] ?? ''));
-        }
-    }
-}
 if ($brandNameRaw === '') {
     $brandNameRaw = (string) pw_env('APP_NAME', 'Public Website');
 }
@@ -463,14 +476,19 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
               }
               $children = $item['children'] ?? [];
               $hasChildren = is_array($children) && count($children) > 0;
+              $isExternal = pw_is_external_url($href);
               $normalized = $href === '/' ? '/home' : rtrim($href, '/');
-              $isActive = $normalized === $currentPath || $normalized === '/' . ltrim($currentPath, '/');
+              $isActive = !$isExternal
+                  && ($normalized === $currentPath || $normalized === '/' . ltrim($currentPath, '/'));
               $childActive = false;
               if ($hasChildren) {
                   foreach ($children as $child) {
                       $ch = (string) ($child['url'] ?? '');
                       if ($ch === '' && !empty($child['pages'][0]['slug'])) {
                           $ch = '/' . $child['pages'][0]['slug'];
+                      }
+                      if (pw_is_external_url($ch)) {
+                          continue;
                       }
                       $chNorm = $ch === '/' ? '/home' : rtrim($ch, '/');
                       if ($chNorm === $currentPath || $chNorm === '/' . ltrim($currentPath, '/')) {
@@ -487,7 +505,10 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
                   $liClass .= ' is-active';
               }
               echo '<li class="' . $liClass . '">';
-              echo '<a class="nav-link' . ($isActive ? ' is-current' : '') . '" href="' . pw_e(pw_url($href)) . '"';
+              echo '<a class="nav-link' . ($isActive ? ' is-current' : '') . '" href="' . pw_e(pw_public_href($href)) . '"';
+              if ($isExternal) {
+                  echo ' target="_blank" rel="noopener noreferrer"';
+              }
               if ($hasChildren) {
                   echo ' aria-haspopup="true" aria-expanded="false"';
               }
@@ -520,7 +541,19 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
           aria-hidden="<?= $index === 0 ? 'false' : 'true' ?>"
         >
           <div class="hero-overlay">
-            <div class="hero-copy">
+            <?php
+              $heroSpaceStyle = [];
+              if (isset($hero['space_subtitle']) && $hero['space_subtitle'] !== null && $hero['space_subtitle'] !== '') {
+                  $heroSpaceStyle[] = '--hero-gap-subtitle: ' . (int) $hero['space_subtitle'] . 'px';
+              }
+              if (isset($hero['space_title']) && $hero['space_title'] !== null && $hero['space_title'] !== '') {
+                  $heroSpaceStyle[] = '--hero-gap-title: ' . (int) $hero['space_title'] . 'px';
+              }
+              if (isset($hero['space_description']) && $hero['space_description'] !== null && $hero['space_description'] !== '') {
+                  $heroSpaceStyle[] = '--hero-gap-actions: ' . (int) $hero['space_description'] . 'px';
+              }
+            ?>
+            <div class="hero-copy"<?= $heroSpaceStyle ? ' style="' . pw_e(implode('; ', $heroSpaceStyle)) . '"' : '' ?>>
               <?php $heroSubtitle = trim((string) ($hero['subtitle'] ?? '')); ?>
               <?php if ($heroSubtitle !== ''): ?>
                 <p class="hero-subtitle"><?= pw_e($heroSubtitle) ?></p>
@@ -841,8 +874,9 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
                 : [];
             $pBtnText = trim((string) ($partner['button_text'] ?? ''));
             $pBtnUrl = trim((string) ($partner['button_url'] ?? ''));
+            $pIconUrl = trim((string) ($partner['icon_url'] ?? ''));
             $pIconHtml = (string) ($partner['icon_html'] ?? '');
-            if ($pIconHtml === '') {
+            if ($pIconUrl === '' && $pIconHtml === '') {
                 $pIconClass = trim((string) ($partner['icon_class_normalized'] ?? $partner['icon_class'] ?? 'fas fa-handshake'));
                 if ($pIconClass === '') {
                     $pIconClass = 'fas fa-handshake';
@@ -855,7 +889,13 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
           ?>
           <article class="partner-card">
             <div class="partner-card-top">
-              <div class="partner-icon" aria-hidden="true"><?= $pIconHtml ?></div>
+              <div class="partner-icon" aria-hidden="true">
+                <?php if ($pIconUrl !== ''): ?>
+                  <img src="<?= pw_e($pIconUrl) ?>" alt="">
+                <?php else: ?>
+                  <?= $pIconHtml ?>
+                <?php endif; ?>
+              </div>
             </div>
             <div class="partner-card-body">
               <?php if ($pBadge !== ''): ?>
@@ -1012,44 +1052,7 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
       <?php if ($contactFormSuccess === ''): ?>
       <form method="post" class="contact-form" novalidate>
         <input type="hidden" name="form_action" value="contact_inquiry">
-        <?php if ((int) ($contactFormSettings['show_full_name'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-half">
-            <span class="contact-field-label">Full Name <span class="req" aria-hidden="true">*</span></span>
-            <input type="text" name="full_name" required value="<?= pw_e($contactFormValues['full_name']) ?>" autocomplete="name" placeholder="Your full name">
-          </label>
-        <?php endif; ?>
-        <?php if ((int) ($contactFormSettings['show_company_name'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-half">
-            <span class="contact-field-label">Company Name</span>
-            <input type="text" name="company_name" value="<?= pw_e($contactFormValues['company_name']) ?>" autocomplete="organization" placeholder="Optional">
-          </label>
-        <?php endif; ?>
-        <?php if ((int) ($contactFormSettings['show_phone'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-third">
-            <span class="contact-field-label">Phone Number <span class="req" aria-hidden="true">*</span></span>
-            <input type="tel" name="phone" required value="<?= pw_e($contactFormValues['phone']) ?>" autocomplete="tel" placeholder="+252 …">
-          </label>
-        <?php endif; ?>
-        <?php if ((int) ($contactFormSettings['show_email'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-third">
-            <span class="contact-field-label">Email Address <span class="req" aria-hidden="true">*</span></span>
-            <input type="email" name="email" required value="<?= pw_e($contactFormValues['email']) ?>" autocomplete="email" placeholder="name@example.com">
-          </label>
-        <?php endif; ?>
-        <?php if ((int) ($contactFormSettings['show_preferred_service'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-third">
-            <span class="contact-field-label">Preferred Service <span class="req" aria-hidden="true">*</span></span>
-            <select name="preferred_service_id" required>
-              <option value="">Select a service</option>
-              <?php foreach ($allServices as $svc): ?>
-                <option value="<?= (int) ($svc['id'] ?? 0) ?>" <?= (string) $contactFormValues['preferred_service_id'] === (string) ($svc['id'] ?? '') ? 'selected' : '' ?>>
-                  <?= pw_e((string) ($svc['title'] ?? '')) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </label>
-        <?php endif; ?>
-        <?php foreach ($contactCustomFields as $cf): ?>
+        <?php foreach ($contactFormFields as $cf): ?>
           <?php
             $ck = (string) ($cf['field_key'] ?? '');
             if ($ck === '') {
@@ -1059,16 +1062,50 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
             $ctype = (string) ($cf['field_type'] ?? 'text');
             $creq = (int) ($cf['is_required'] ?? 0) === 1;
             $cval = (string) ($contactFormValues[$ck] ?? '');
-            $fieldClass = $ctype === 'textarea' ? 'contact-field contact-field-full' : 'contact-field contact-field-half';
+            $colWidth = (int) ($cf['column_width'] ?? 0);
+            if (!in_array($colWidth, [3, 4, 6, 8, 12], true)) {
+                $colWidth = ($ctype === 'textarea' || $ck === 'message') ? 12 : 6;
+            }
+            $fieldClass = 'contact-field contact-col-' . $colWidth;
+            $placeholder = '';
+            $inputType = 'text';
+            $autocomplete = '';
+            if ($ck === 'full_name') {
+                $placeholder = 'Your full name';
+                $autocomplete = 'name';
+            } elseif ($ck === 'company_name') {
+                $placeholder = 'Optional';
+                $autocomplete = 'organization';
+            } elseif ($ck === 'phone') {
+                $inputType = 'tel';
+                $placeholder = '+252 …';
+                $autocomplete = 'tel';
+            } elseif ($ck === 'email') {
+                $inputType = 'email';
+                $placeholder = 'name@example.com';
+                $autocomplete = 'email';
+            } elseif ($ck === 'message') {
+                $placeholder = 'How can we help you?';
+            }
+            $selectOptions = $cf['options'] ?? [];
+            if ($ck === 'preferred_service_id' && (!$selectOptions || !is_array($selectOptions))) {
+                $selectOptions = [];
+                foreach ($allServices as $svc) {
+                    $selectOptions[] = [
+                        'value' => (string) ((int) ($svc['id'] ?? 0)),
+                        'label' => (string) ($svc['title'] ?? ''),
+                    ];
+                }
+            }
           ?>
           <label class="<?= $fieldClass ?>">
             <span class="contact-field-label"><?= pw_e($clabel) ?><?php if ($creq): ?> <span class="req" aria-hidden="true">*</span><?php endif; ?></span>
             <?php if ($ctype === 'textarea'): ?>
-              <textarea name="<?= pw_e($ck) ?>" rows="4" <?= $creq ? 'required' : '' ?>><?= pw_e($cval) ?></textarea>
+              <textarea name="<?= pw_e($ck) ?>" rows="<?= $ck === 'message' ? 5 : 4 ?>" <?= $creq ? 'required' : '' ?> placeholder="<?= pw_e($placeholder) ?>"><?= pw_e($cval) ?></textarea>
             <?php elseif ($ctype === 'select'): ?>
               <select name="<?= pw_e($ck) ?>" <?= $creq ? 'required' : '' ?>>
-                <option value="">Select…</option>
-                <?php foreach (($cf['options'] ?? []) as $opt): ?>
+                <option value=""><?= $ck === 'preferred_service_id' ? 'Select a service' : 'Select…' ?></option>
+                <?php foreach ($selectOptions as $opt): ?>
                   <?php
                     if (is_array($opt)) {
                         $optValue = (string) ($opt['value'] ?? '');
@@ -1089,16 +1126,10 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
             <?php elseif ($ctype === 'date'): ?>
               <input type="date" name="<?= pw_e($ck) ?>" value="<?= pw_e($cval) ?>" <?= $creq ? 'required' : '' ?>>
             <?php else: ?>
-              <input type="text" name="<?= pw_e($ck) ?>" value="<?= pw_e($cval) ?>" <?= $creq ? 'required' : '' ?>>
+              <input type="<?= pw_e($inputType) ?>" name="<?= pw_e($ck) ?>" value="<?= pw_e($cval) ?>" <?= $creq ? 'required' : '' ?><?= $autocomplete !== '' ? ' autocomplete="' . pw_e($autocomplete) . '"' : '' ?><?= $placeholder !== '' ? ' placeholder="' . pw_e($placeholder) . '"' : '' ?>>
             <?php endif; ?>
           </label>
         <?php endforeach; ?>
-        <?php if ((int) ($contactFormSettings['show_message'] ?? 1) === 1): ?>
-          <label class="contact-field contact-field-full">
-            <span class="contact-field-label">Comments / Message <span class="req" aria-hidden="true">*</span></span>
-            <textarea name="message" rows="5" required placeholder="How can we help you?"><?= pw_e($contactFormValues['message']) ?></textarea>
-          </label>
-        <?php endif; ?>
         <div class="contact-form-actions">
           <button type="submit" class="contact-form-submit">Submit</button>
         </div>
@@ -1196,7 +1227,8 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
         <?php if ($footerQuickLinks): ?>
           <ul class="footer-menu">
             <?php foreach ($footerQuickLinks as $link): ?>
-              <li><a href="<?= pw_e(pw_url($link['url'])) ?>"><?= pw_e($link['title']) ?></a></li>
+              <?php $footerHref = pw_public_href((string) $link['url']); ?>
+              <li><a href="<?= pw_e($footerHref) ?>"<?php if (pw_is_external_url((string) $link['url'])): ?> target="_blank" rel="noopener noreferrer"<?php endif; ?>><?= pw_e($link['title']) ?></a></li>
             <?php endforeach; ?>
           </ul>
         <?php else: ?>
@@ -1205,11 +1237,12 @@ $bodyClassAttr = $bodyClasses !== [] ? ' class="' . pw_e(implode(' ', $bodyClass
       </div>
 
       <div class="footer-col">
-        <h3 class="footer-heading"><a class="footer-heading-link" href="<?= pw_e(pw_url($footerServicesPageUrl)) ?>">Services</a></h3>
+        <h3 class="footer-heading"><a class="footer-heading-link" href="<?= pw_e(pw_public_href($footerServicesPageUrl)) ?>"<?php if (pw_is_external_url($footerServicesPageUrl)): ?> target="_blank" rel="noopener noreferrer"<?php endif; ?>>Services</a></h3>
         <?php if ($footerServiceLinks): ?>
           <ul class="footer-menu">
             <?php foreach ($footerServiceLinks as $link): ?>
-              <li><a href="<?= pw_e(pw_url($link['url'])) ?>"><?= pw_e($link['title']) ?></a></li>
+              <?php $footerHref = pw_public_href((string) $link['url']); ?>
+              <li><a href="<?= pw_e($footerHref) ?>"<?php if (pw_is_external_url((string) $link['url'])): ?> target="_blank" rel="noopener noreferrer"<?php endif; ?>><?= pw_e($link['title']) ?></a></li>
             <?php endforeach; ?>
           </ul>
         <?php else: ?>

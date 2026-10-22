@@ -19,6 +19,20 @@ ob_start();
 </div>
 <div class="panel">
   <p>Status: <?= wa_badge((int)$p['is_active']) ?></p>
+  <p>
+    <span style="display:inline-flex;width:48px;height:48px;align-items:center;justify-content:center;background:#f3f4f6;border-radius:10px;color:#e0893a">
+      <?php if (!empty($p['icon_url'])): ?>
+        <img src="<?= wa_e((string)$p['icon_url']) ?>" alt="" style="width:32px;height:32px;object-fit:contain">
+      <?php else: ?>
+        <?= (string)($p['icon_html'] ?? '') ?>
+      <?php endif; ?>
+    </span>
+    <?php if (empty($p['icon_url']) && !empty($p['icon_class'])): ?>
+      <span class="muted" style="margin-left:0.5rem"><?= wa_e((string)$p['icon_class']) ?></span>
+    <?php elseif (!empty($p['icon_url'])): ?>
+      <span class="muted" style="margin-left:0.5rem">Uploaded image</span>
+    <?php endif; ?>
+  </p>
   <?php if (!empty($p['section_title'])): ?><p class="muted">Section: <?= wa_e((string)$p['section_title']) ?></p><?php endif; ?>
   <?php if (!empty($p['section_subtitle'])): ?><p class="muted"><?= wa_e((string)$p['section_subtitle']) ?></p><?php endif; ?>
   <?php if (!empty($p['badge_text'])): ?><p><span class="muted"><?= wa_e((string)$p['badge_text']) ?></span></p><?php endif; ?>

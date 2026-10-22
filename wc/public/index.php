@@ -136,6 +136,7 @@ try {
         'GET /api/contact-form/fields' => 'contact_form/fields_list.php',
         'POST /api/contact-form/fields' => 'contact_form/fields_create.php',
         'POST /api/contact-form/fields/update' => 'contact_form/fields_update.php',
+        'POST /api/contact-form/fields/hide' => 'contact_form/fields_hide.php',
         'POST /api/contact-form/fields/delete' => 'contact_form/fields_delete.php',
         'GET /api/contact-inquiries' => 'contact_inquiries/list.php',
         'GET /api/contact-inquiries/view' => 'contact_inquiries/view.php',

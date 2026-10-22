@@ -77,7 +77,28 @@ function wa_api(string $method, string $path, array $data = [], array $files = [
         return ['success' => false, 'message' => 'Invalid API response', 'http_status' => $status, 'data' => null, 'raw' => $body];
     }
     $decoded['http_status'] = $status;
+
+    // WA keeps a local user in $_SESSION; WC Bearer can expire independently.
+    // Force re-login instead of rendering empty admin screens as "Unauthenticated".
+    if ($status === 401 && $token) {
+        $pathNorm = '/' . ltrim($path, '/');
+        if (!str_starts_with($pathNorm, '/api/auth/login') && !str_starts_with($pathNorm, '/api/auth/logout')) {
+            wa_force_relogin('Your session expired. Please sign in again.');
+        }
+    }
+
     return $decoded;
+}
+
+/**
+ * Drop local auth (WC token already invalid) and send user to login with flash.
+ */
+function wa_force_relogin(string $message = 'Please sign in again.'): never
+{
+    wa_start_session();
+    unset($_SESSION['api_token'], $_SESSION['csrf_token'], $_SESSION['user']);
+    wa_flash('error', $message);
+    wa_redirect('/login');
 }
 
 function wa_api_ok(array $response): bool
@@ -143,5 +164,8 @@ function wa_api_multipart(string $path, array $fields, array $file = [], string 
         return ['success' => false, 'message' => 'Invalid API response', 'http_status' => $status];
     }
     $decoded['http_status'] = $status;
+    if ($status === 401 && $token) {
+        wa_force_relogin('Your session expired. Please sign in again.');
+    }
     return $decoded;
 }

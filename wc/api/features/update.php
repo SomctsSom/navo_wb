@@ -44,6 +44,11 @@ if (array_key_exists('cards_json', $input)) {
     if (!is_array($cards)) {
         json_error('Invalid cards_json', 422);
     }
+    try {
+        $cards = feature_cards_apply_uploads($cards);
+    } catch (Throwable $e) {
+        json_error($e->getMessage(), 422);
+    }
 }
 
 if ($title === '') {

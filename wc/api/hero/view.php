@@ -18,6 +18,7 @@ if (!$row) {
 $row['id'] = (int) $row['id'];
 $row['is_active'] = (int) $row['is_active'];
 $row['image_url'] = secure_public_media_url($row['image_path']);
+$row = hero_attach_spacing($row);
 $ps = $pdo->prepare(
     'SELECT hp.id AS hero_page_id, hp.page_id, hp.is_featured, hp.is_active, hp.sort_order, p.title, p.slug, p.page_type
      FROM hero_pages hp

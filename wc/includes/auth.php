@@ -91,8 +91,16 @@ function auth_current_session(): ?array
         return null;
     }
 
-    $upd = $pdo->prepare('UPDATE api_sessions SET last_seen_at = :seen WHERE id = :id');
-    $upd->execute([':seen' => now_utc(), ':id' => $row['id']]);
+    // Sliding expiry: keep active admins authenticated while they use the API.
+    $lifetime = (int) app_config('session_lifetime', 7200);
+    $newExpires = gmdate('Y-m-d H:i:s', time() + $lifetime);
+    $upd = $pdo->prepare('UPDATE api_sessions SET last_seen_at = :seen, expires_at = :expires WHERE id = :id');
+    $upd->execute([
+        ':seen' => now_utc(),
+        ':expires' => $newExpires,
+        ':id' => $row['id'],
+    ]);
+    $row['expires_at'] = $newExpires;
 
     $session = $row;
     return $session;

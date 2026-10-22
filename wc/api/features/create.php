@@ -29,6 +29,12 @@ if (mb_strlen($mainTitle) > 200) {
     json_error('Main title must be 200 characters or less', 422);
 }
 
+try {
+    $cards = feature_cards_apply_uploads($cards);
+} catch (Throwable $e) {
+    json_error($e->getMessage(), 422);
+}
+
 $pdo = db();
 $pdo->beginTransaction();
 try {

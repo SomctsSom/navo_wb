@@ -62,7 +62,10 @@ ob_start();
   <form method="post" class="form-grid">
     <?= wa_csrf_field() ?>
     <label>Title<input name="title" required value="<?= wa_e((string)$menu['title']) ?>"></label>
-    <label>URL<input name="url" value="<?= wa_e((string)($menu['url'] ?? '')) ?>" placeholder="/about"></label>
+    <label>URL
+      <input name="url" value="<?= wa_e((string)($menu['url'] ?? '')) ?>" placeholder="/about or https://example.com">
+      <span class="muted">Absolute http(s) links open in a new tab on the public site.</span>
+    </label>
     <label>Icon<input name="icon" value="<?= wa_e((string)($menu['icon'] ?? '')) ?>"></label>
     <label>Sort order<input type="number" name="sort_order" value="<?= (int)$menu['sort_order'] ?>"></label>
     <label>Parent

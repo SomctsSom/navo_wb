@@ -26,6 +26,7 @@ require_once __DIR__ . '/cta_banner_helpers.php';
 require_once __DIR__ . '/partner_helpers.php';
 require_once __DIR__ . '/contact_social_helpers.php';
 require_once __DIR__ . '/contact_form_helpers.php';
+require_once __DIR__ . '/mail.php';
 require_once __DIR__ . '/page_section_helpers.php';
 
 // Ensure app config is loaded via helper

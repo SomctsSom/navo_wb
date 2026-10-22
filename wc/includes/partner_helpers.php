@@ -111,6 +111,10 @@ function partner_normalize_row(array $row): array
     $row['section_title'] = (string) ($row['section_title'] ?? '');
     $row['section_subtitle'] = (string) ($row['section_subtitle'] ?? '');
     $row['icon_class'] = (string) ($row['icon_class'] ?? '');
+    $row['icon_url'] = !empty($row['icon_path'])
+        ? secure_public_media_url((string) $row['icon_path'])
+        : null;
+    unset($row['icon_path']);
     $row['badge_text'] = (string) ($row['badge_text'] ?? '');
     $row['name'] = (string) ($row['name'] ?? '');
     $row['category'] = (string) ($row['category'] ?? '');
